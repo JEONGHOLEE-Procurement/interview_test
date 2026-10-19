@@ -68,7 +68,9 @@ h2{font-size:clamp(24px,3vw,32px);margin:0 0 8px;letter-spacing:-.02em}
 .box ul{margin:0;padding-left:18px;color:#c7ccd6}
 .box.good{border-color:rgba(45,140,255,.5)}
 
-.sc-list{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sc-list{display:flex;flex-direction:column;gap:20px}
+.co-sec h3{margin:0 0 10px;font-size:17px}
+.sc-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .sc{display:block;text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
 .sc:hover{border-color:var(--accent)}
 .sc small{display:block;font-size:12px;color:#7fb6ff;font-weight:700}
@@ -78,7 +80,7 @@ h2{font-size:clamp(24px,3vw,32px);margin:0 0 8px;letter-spacing:-.02em}
 footer{padding:28px 0 40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 
 @media (max-width:860px){
-  .sc-list{grid-template-columns:1fr 1fr}
+  .sc-row{grid-template-columns:1fr}
   .hero{grid-template-columns:1fr;padding-top:24px}
   .steps{grid-template-columns:1fr 1fr}
   .teams{grid-template-columns:1fr}
@@ -160,7 +162,7 @@ footer{padding:28px 0 40px;color:var(--muted);font-size:13px;border-top:1px soli
 <section class="final">
   <div class="wrap">
     <h2>면접 전에 한 번, 회의실에 앉아 보세요</h2>
-    <p class="sub">현대자동차·기아 PT 면접 발제 4개를 체험할 수 있습니다. 다른 기업은 순차적으로 준비 중입니다.</p>
+    <p class="sub">현대자동차 1개, 기아 3개 PT 면접 발제를 체험할 수 있습니다. 다른 기업은 순차적으로 준비 중입니다.</p>
     <a class="btn primary" href="app.html">지금 체험하기 →</a>
   </div>
 </section>
@@ -177,7 +179,14 @@ footer{padding:28px 0 40px;color:var(--muted);font-size:13px;border-top:1px soli
   const ALL = window.SCENARIOS || [], S = ALL[0];
   const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
   const list = document.getElementById("scList");
-  ALL.forEach(sc => { const a = el("a", "sc"); a.href = "app.html?s=" + encodeURIComponent(sc.id); a.append(el("small", null, sc.company.name), el("b", null, sc.shortTitle), el("span", null, `${sc.teams.length}개 부서 · ${sc.agenda.sources[0].outlet} ${sc.agenda.sources[0].date}`)); list.append(a); });
+  const order = ["현대자동차", "기아"], groups = new Map();
+  ALL.forEach(sc => { if (!groups.has(sc.company.name)) groups.set(sc.company.name, []); groups.get(sc.company.name).push(sc); });
+  [...groups].sort((a, b) => (order.indexOf(a[0]) + 99) % 99 - (order.indexOf(b[0]) + 99) % 99).forEach(([name, items]) => {
+    const sec = el("div", "co-sec"), grid = el("div", "sc-row");
+    sec.append(el("h3", null, `${name} PT 면접 · ${items.length}개`), grid);
+    items.forEach(sc => { const a = el("a", "sc"); a.href = "app.html?s=" + encodeURIComponent(sc.id); a.append(el("b", null, sc.shortTitle), el("span", null, `${sc.teams.length}개 부서 · ${sc.agenda.sources[0].outlet} ${sc.agenda.sources[0].date}`)); grid.append(a); });
+    list.append(sec);
+  });
   const box = document.getElementById("agenda");
   box.append(el("div", "tag", `예시 · ${S.company.name} · ${S.company.interviewType}`), el("h3", null, S.agenda.title), el("p", null, S.agenda.question));
   const ul = el("ul"); S.agenda.facts.slice(0, 4).forEach(f => ul.append(el("li", null, f.text))); box.append(ul);
