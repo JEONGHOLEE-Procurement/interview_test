@@ -9,6 +9,10 @@
 <script src="data/scenario-hmc-cost.js"></script>
 <script src="data/scenario-hmc-na.js"></script>
 <script src="data/scenario-hmc-robotics.js"></script>
+<script src="data/scenario-hmc-india-sourcing.js"></script>
+<script src="data/scenario-hmc-battery-sourcing.js"></script>
+<script src="data/scenario-kia-esg-supply.js"></script>
+<script src="data/scenario-hmc-atlas-supply.js"></script>
 <script src="data/scenario-kia-cost.js"></script>
 <script src="data/scenario-kia-us.js"></script>
 <script src="data/scenario-kia-pbv.js"></script>
@@ -233,6 +237,10 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
 .join .sub{color:var(--muted);margin:0 0 20px}
 .join h2{font-size:15px;margin:22px 0 4px}
 .sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px;margin-top:10px}
+.role-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.role-chips button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--muted)}
+.role-chips button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.sc-card .fx{align-self:flex-start;font-size:11px;font-weight:700;color:#04060a;background:#9be11e;border-radius:4px;padding:0 6px}
 .co-sec{margin-top:12px}
 .co-head{font-size:13px;font-weight:700;color:#7fb6ff;margin-bottom:-2px}
 .sc-card{text-align:left;background:var(--panel);border:2px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
@@ -272,6 +280,8 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
   <div class="join-inner">
     <h1>PT 면접 대기실</h1>
     <p class="sub">발제를 고르고, 지원 직무를 선택하면 회의실에 입장합니다.</p>
+    <h2>내 직무로 찾기</h2>
+    <div class="role-chips" id="roleChips"></div>
     <h2>1. 법인·발제 선택</h2>
     <div id="scGrid"></div>
     <div class="agenda-box" id="agendaBox"></div>
@@ -440,18 +450,39 @@ const footnote = () => `※ 출처: ${S.agenda.sources.map(s => `${s.outlet} ${s
 
 /* ================= 입장 화면 ================= */
 const COMPANY_ORDER = ["현대자동차", "기아"];
+const ROLES = [
+  { id: "구매", re: /구매|부품개발/ }, { id: "원가", re: /원가/ }, { id: "품질", re: /품질/ }, { id: "생산", re: /생산|물류|SCM/ },
+  { id: "연구개발", re: /연구|개발팀|배터리개발/ }, { id: "재무", re: /재무/ }, { id: "영업", re: /영업/ }, { id: "기획", re: /기획/ },
+  { id: "인사·안전·IT", re: /인사|안전|IT|ESG|서비스/ },
+];
+let role = new URLSearchParams(location.search).get("role") || "";
+const roleOf = id => ROLES.find(r => r.id === id);
+const teamFits = t => !role || roleOf(role).re.test(t.name);
+const fitsRole = sc => !role || sc.teams.some(teamFits);
+function renderRoleChips(){
+  const box = $("#roleChips"); box.innerHTML = "";
+  [{ id: "" }, ...ROLES].forEach(r => {
+    const b = el("button", r.id === role ? "on" : "", r.id || "전체");
+    b.onclick = () => { role = r.id; if (!fitsRole(S)) S = visibleScenarios()[0] || S; st.team = null; renderJoin(); };
+    box.append(b);
+  });
+}
+const visibleScenarios = () => companies().flatMap(c => c.items);
 function companies(){
   const map = new Map();
-  ALL.forEach(sc => { if (!map.has(sc.company.name)) map.set(sc.company.name, []); map.get(sc.company.name).push(sc); });
+  ALL.filter(fitsRole).sort((a, b) => (b.focus === role) - (a.focus === role)).forEach(sc => { if (!map.has(sc.company.name)) map.set(sc.company.name, []); map.get(sc.company.name).push(sc); });
   return [...map].map(([name, items]) => ({ name, items })).sort((a, b) => (COMPANY_ORDER.indexOf(a.name) + 99) % 99 - (COMPANY_ORDER.indexOf(b.name) + 99) % 99);
 }
 function renderJoin(){
+  renderRoleChips();
+  if (role && !st.team) { const t = S.teams.find(teamFits); if (t) st.team = t.id; }
   const sg = $("#scGrid"); sg.innerHTML = "";
   companies().forEach(co => {
     const sec = el("div", "co-sec"), grid = el("div", "sc-grid");
     sec.append(el("div", "co-head", `${co.name} · 발제 ${co.items.length}개`), grid);
     co.items.forEach(sc => {
       const b = el("button", "sc-card" + (sc === S ? " sel" : ""));
+      if (sc.focus) b.append(el("span", "fx", `${sc.focus} 직무 특화`));
       b.append(el("span", "nm", sc.shortTitle), el("span", "ds", `${sc.agenda.sources[0].outlet} · ${sc.agenda.sources[0].date}`));
       b.onclick = () => { S = sc; st.team = null; renderJoin(); };
       grid.append(b);
@@ -463,6 +494,7 @@ function renderJoin(){
   const grid = $("#teamGrid"); grid.innerHTML = "";
   S.teams.forEach(t => {
     const b = el("button", "team-card" + (st.team === t.id ? " sel" : ""));
+    if (role && !teamFits(t)) b.style.opacity = ".55";
     const nm = el("div", "nm"), dot = el("span", "dot"); dot.style.background = t.color;
     nm.append(dot, document.createTextNode(t.name));
     b.append(nm, el("div", "pr", "화두 · " + t.prompt));
@@ -590,7 +622,8 @@ function startRebuttal(){
 }
 function startQA(){
   const own = S.followUps[st.team] || [], common = S.followUps.common || DEFAULT_COMMON;
-  st.qa = [ { by: "iv1", q: own[0] }, { by: "iv2", q: common[Math.floor(Math.random() * common.length)] } ].filter(x => x.q).map(x => ({ ...x, answer: "", seconds: 0 }));
+  const ownQs = own.slice(0, S.ownQuestions || 1).map((q, i) => ({ by: i % 2 ? "iv2" : "iv1", q }));
+  st.qa = [ ...ownQs, { by: ownQs.length % 2 ? "iv2" : "iv1", q: common[Math.floor(Math.random() * common.length)] } ].filter(x => x.q).map(x => ({ ...x, answer: "", seconds: 0 }));
   st.qaIndex = 0; askQ();
 }
 function askQ(){
