@@ -9,7 +9,7 @@ ALLOWED_ORIGINS = "https://jeongholee-procurement.github.io,http://localhost:808
 NOTION_SESSIONS_DB = "2347dd8cadae4bfb899f9c6728dd5d65"
 NOTION_WAITLIST_DB = "88a5f66c0812413d8c44d246f6a334d1"
 # 발제 ID → 발제 DB 페이지 ID
-SCENARIO_PAGES = '{"hmc-india-capa-2026-10":"3fec6be7defa8177ad1dcc618cc8e1dc","kia-cost-2026":"3fec6be7defa81fd80eed9924d6fa5ca","kia-us-localization-2026":"3fec6be7defa812f999ed977dbc892cd","kia-pbv-2026":"3fec6be7defa81a5a10ef04e047179cb"}'
+SCENARIO_PAGES = '{"hmc-india-capa-2026-10":"3fec6be7defa8177ad1dcc618cc8e1dc","kia-cost-2026":"3fec6be7defa81fd80eed9924d6fa5ca","kia-us-localization-2026":"3fec6be7defa812f999ed977dbc892cd","kia-pbv-2026":"3fec6be7defa81a5a10ef04e047179cb","hmc-cost-2030":"3fec6be7defa81548b79f438ee3c7d7e","hmc-north-america-2030":"3fec6be7defa81658ba7e4d53947b06c","hmc-physical-ai-2028":"3fec6be7defa817a974dc4d51b9ee6ce"}'
 
 # 비밀값은 wrangler secret 으로만 넣는다 (코드·저장소에 쓰지 않음)
 #   npx wrangler secret put NOTION_TOKEN   ← Notion 내부 통합 토큰
