@@ -1,0 +1,8 @@
+# Render: 정적 사이트로 배포 (권장, 무료). 대시보드에서 "Blueprint"로 이 파일을 쓰거나,
+# Static Site를 만들고 Publish directory를 app 으로 지정하면 같다.
+services:
+  - type: web
+    name: cheotmudae
+    runtime: static
+    buildCommand: echo "no build"
+    staticPublishPath: ./app

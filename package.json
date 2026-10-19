@@ -1,0 +1,11 @@
+{
+  "name": "cheotmudae",
+  "version": "0.1.0",
+  "private": true,
+  "description": "첫무대 PT 면접 회의실 (정적 사이트)",
+  "scripts": {
+    "build": "echo \"정적 사이트라 빌드할 것이 없습니다\"",
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" }
+}

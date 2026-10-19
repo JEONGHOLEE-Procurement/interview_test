@@ -230,6 +230,8 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
 .join .sub{color:var(--muted);margin:0 0 20px}
 .join h2{font-size:15px;margin:22px 0 4px}
 .sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px;margin-top:10px}
+.co-sec{margin-top:12px}
+.co-head{font-size:13px;font-weight:700;color:#7fb6ff;margin-bottom:-2px}
 .sc-card{text-align:left;background:var(--panel);border:2px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
 .sc-card.sel{border-color:var(--accent);background:rgba(45,140,255,.08)}
 .sc-card .co{font-size:11px;font-weight:700;color:#7fb6ff}
@@ -267,8 +269,8 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
   <div class="join-inner">
     <h1>PT 면접 대기실</h1>
     <p class="sub">발제를 고르고, 지원 직무를 선택하면 회의실에 입장합니다.</p>
-    <h2>1. 발제 선택</h2>
-    <div class="sc-grid" id="scGrid"></div>
+    <h2>1. 법인·발제 선택</h2>
+    <div id="scGrid"></div>
     <div class="agenda-box" id="agendaBox"></div>
     <h2>2. 지원 직무 선택</h2>
     <div class="hint">고른 팀의 일원으로 회의에 들어갑니다. 같은 발제라도 팀마다 다른 화두를 받습니다.</div>
@@ -434,13 +436,24 @@ const initials = s => s.replace(/(책임|매니저|상무|실장|면접관)/g, "
 const footnote = () => `※ 출처: ${S.agenda.sources.map(s => `${s.outlet} ${s.title.length > 26 ? s.title.slice(0, 26) + "…" : s.title}`).join(" / ")} · '(가정)'은 팀 가정치`;
 
 /* ================= 입장 화면 ================= */
+const COMPANY_ORDER = ["현대자동차", "기아"];
+function companies(){
+  const map = new Map();
+  ALL.forEach(sc => { if (!map.has(sc.company.name)) map.set(sc.company.name, []); map.get(sc.company.name).push(sc); });
+  return [...map].map(([name, items]) => ({ name, items })).sort((a, b) => (COMPANY_ORDER.indexOf(a.name) + 99) % 99 - (COMPANY_ORDER.indexOf(b.name) + 99) % 99);
+}
 function renderJoin(){
   const sg = $("#scGrid"); sg.innerHTML = "";
-  ALL.forEach(sc => {
-    const b = el("button", "sc-card" + (sc === S ? " sel" : ""));
-    b.append(el("span", "co", sc.company.name), el("span", "nm", sc.shortTitle), el("span", "ds", `${sc.agenda.sources[0].outlet} · ${sc.agenda.sources[0].date}`));
-    b.onclick = () => { S = sc; st.team = null; renderJoin(); };
-    sg.append(b);
+  companies().forEach(co => {
+    const sec = el("div", "co-sec"), grid = el("div", "sc-grid");
+    sec.append(el("div", "co-head", `${co.name} · 발제 ${co.items.length}개`), grid);
+    co.items.forEach(sc => {
+      const b = el("button", "sc-card" + (sc === S ? " sel" : ""));
+      b.append(el("span", "nm", sc.shortTitle), el("span", "ds", `${sc.agenda.sources[0].outlet} · ${sc.agenda.sources[0].date}`));
+      b.onclick = () => { S = sc; st.team = null; renderJoin(); };
+      grid.append(b);
+    });
+    sg.append(sec);
   });
   const ab = $("#agendaBox"); ab.innerHTML = "";
   ab.append(el("div", "k", `${S.company.name} · ${S.company.interviewType} · 준비 ${S.agenda.prepMinutes}분 · 발표 ${Math.round(S.agenda.speakSeconds / 60)}분`), el("h3", null, S.agenda.title), el("div", null, S.agenda.situation));
