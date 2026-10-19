@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PT 면접 회의실</title>
+<script src="config.js"></script>
 <script src="data/scenario-hyundai-india.js"></script>
 <script src="data/scenario-kia-cost.js"></script>
 <script src="data/scenario-kia-us.js"></script>
@@ -277,6 +278,14 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
         <label class="f" for="nameInput">3. 이름 (화면 표시용)</label>
         <input class="t" id="nameInput" maxlength="12" placeholder="예: 이지원">
       </div>
+      <div>
+        <label class="f" for="stageInput">전형 단계 (선택)</label>
+        <select class="t" id="stageInput"><option value="">선택 안 함</option><option>서류합격</option><option>1차면접</option><option>최종면접</option></select>
+      </div>
+      <div>
+        <label class="f" for="dateInput">면접 예정일 (선택)</label>
+        <input class="t" type="date" id="dateInput">
+      </div>
       <button class="btn primary" id="joinBtn">회의 입장</button>
     </div>
     <div class="join-need" id="joinNeed"></div>
@@ -457,6 +466,7 @@ function checkJoin(){
 nameInput.addEventListener("keydown", e => { if (e.key === "Enter" && !$("#joinBtn").disabled) $("#joinBtn").click(); });
 $("#joinBtn").onclick = () => {
   st.name = nameInput.value.trim(); st.startedAt = new Date().toISOString();
+  st.stage = $("#stageInput").value; st.interviewDate = $("#dateInput").value;
   $("#join").classList.add("hidden");
   $("#meetingTitle").textContent = `${S.company.name} · ${S.agenda.title}`;
   $("#roomTable").dataset.label = S.tableLabel || "PT 회의";
@@ -1122,16 +1132,52 @@ function resultPanel(body){
     const bar = el("div", "bar"), i = el("i"); i.style.width = sc[r.id].score * 20 + "%"; bar.append(i);
     row.append(top, bar, el("div", "tip", sc[r.id].tip)); body.append(row);
   });
+  savePanel(body, sc);
   button(body, "결과 JSON 내보내기 (백엔드 전송 형식)", () => download(sessionPayload(sc)), false);
   button(body, "다른 발제·직무로 다시 하기", () => location.reload());
 }
+const BACKEND = (window.APP_CONFIG || {}).backendUrl || "";
+function savePanel(body, sc){
+  const c = el("div", "card"); body.append(c);
+  if (!BACKEND) { c.append(el("div", "k", "결과 저장"), el("div", "hint", "서버 연결 전이라 결과는 이 브라우저 밖으로 전송되지 않습니다.")); return; }
+  if (st.saved) return outcomePanel(c);
+  const lab = el("label", "row"), cb = el("input"); cb.type = "checkbox";
+  lab.append(cb, el("span", "hint", "면접 기록(이름·답변·점수)을 서비스 개선과 내 기록 확인을 위해 저장하는 데 동의합니다. 영상·음성은 저장하지 않습니다."));
+  const btn = el("button", "btn block primary", "결과 저장"); btn.disabled = true; cb.onchange = () => btn.disabled = !cb.checked;
+  const msg = el("div", "hint");
+  btn.onclick = async () => {
+    btn.disabled = true; msg.textContent = "저장 중…";
+    try {
+      const r = await fetch(BACKEND.replace(/\/$/, "") + "/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...sessionPayload(sc), consent: true }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+      st.saved = await r.json(); renderSide();
+    } catch (e) { msg.textContent = "저장하지 못했습니다: " + e.message; btn.disabled = false; }
+  };
+  c.append(el("div", "k", "결과 저장"), lab, btn, msg);
+}
+function outcomePanel(c){
+  c.append(el("div", "k", "저장 완료 · 한 가지만 더"), el("div", "hint", "이번 연습이 도움이 됐나요? 실제 면접 결과가 나오면 알려주세요."));
+  const send = async (data, done) => {
+    const r = await fetch(`${BACKEND.replace(/\/$/, "")}/api/sessions/${st.saved.sessionId}/outcome`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...data, editToken: st.saved.editToken }) });
+    done.textContent = r.ok ? "기록했습니다." : "기록하지 못했습니다.";
+  };
+  const row1 = el("div", "btn-row"), d1 = el("div", "hint");
+  [1, 2, 3, 4, 5].forEach(n => { const b = el("button", "btn", "★".repeat(n)); b.onclick = () => send({ satisfaction: n }, d1); row1.append(b); });
+  const row2 = el("div", "btn-row"), d2 = el("div", "hint");
+  ["합격", "불합격", "미정"].forEach(v => { const b = el("button", "btn", v); b.onclick = () => send({ actualResult: v }, d2); row2.append(b); });
+  c.append(el("label", "f", "만족도"), row1, d1, el("label", "f", "실제 면접 결과"), row2, d2);
+}
 function sessionPayload(score){
+  const rb = st.rebuttal ? { ...st.rebuttal, fromName: teamById(st.rebuttal.from)?.name } : null;
   return {
-    scenarioId: S.id, companyId: S.company.id, team: st.team, applicant: { displayName: st.name },
+    scenarioId: S.id, scenarioTitle: S.shortTitle, companyId: S.company.id, companyName: S.company.name, team: st.team, teamName: myTeam().name,
+    applicant: { displayName: st.name, stage: st.stage || "", interviewDate: st.interviewDate || "" },
+    slideTitle: slideTitle(), withinTime: st.presentSeconds > 0 && st.presentSeconds <= S.agenda.speakSeconds + 15,
+    visitedSeatNames: [...st.visited].map(id => teamById(id)?.name).filter(Boolean),
     startedAt: st.startedAt, endedAt: new Date().toISOString(),
     slide: { elements: ED.els, text: ED.els.map(e => e.text).filter(filled) },
     script: { text: st.script, source: st.scriptSource, seconds: st.presentSeconds },
-    rebuttal: st.rebuttal, qa: st.qa.map(({ by, q, answer, seconds }) => ({ by, question: q, answer, seconds })),
+    rebuttal: rb, qa: st.qa.map(({ by, q, answer, seconds }) => ({ by, question: q, answer, seconds })),
     visitedSeats: [...st.visited], selfScore: Object.fromEntries(Object.entries(score).map(([k, v]) => [k, v.score])),
     transcript: st.log,
   };
