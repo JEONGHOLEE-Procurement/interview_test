@@ -9,6 +9,10 @@
 <script src="data/scenario-hmc-cost.js"></script>
 <script src="data/scenario-hmc-na.js"></script>
 <script src="data/scenario-hmc-robotics.js"></script>
+<script src="data/scenario-hmc-india-sourcing.js"></script>
+<script src="data/scenario-hmc-battery-sourcing.js"></script>
+<script src="data/scenario-kia-esg-supply.js"></script>
+<script src="data/scenario-hmc-atlas-supply.js"></script>
 <script src="data/scenario-kia-cost.js"></script>
 <script src="data/scenario-kia-us.js"></script>
 <script src="data/scenario-kia-pbv.js"></script>
@@ -165,7 +169,7 @@ footer{padding:28px 0 40px;color:var(--muted);font-size:13px;border-top:1px soli
 <section class="final">
   <div class="wrap">
     <h2>면접 전에 한 번, 회의실에 앉아 보세요</h2>
-    <p class="sub">현대자동차 4개, 기아 3개 PT 면접 발제를 체험할 수 있습니다. 다른 기업은 순차적으로 준비 중입니다.</p>
+    <p class="sub">현대자동차 7개, 기아 4개 PT 면접 발제(구매 직무 특화 4개 포함)를 체험할 수 있습니다. 다른 기업은 순차적으로 준비 중입니다.</p>
     <a class="btn primary" href="app.html">지금 체험하기 →</a>
   </div>
 </section>
@@ -187,7 +191,7 @@ footer{padding:28px 0 40px;color:var(--muted);font-size:13px;border-top:1px soli
   [...groups].sort((a, b) => (order.indexOf(a[0]) + 99) % 99 - (order.indexOf(b[0]) + 99) % 99).forEach(([name, items]) => {
     const sec = el("div", "co-sec"), grid = el("div", "sc-row");
     sec.append(el("h3", null, `${name} PT 면접 · ${items.length}개`), grid);
-    items.forEach(sc => { const a = el("a", "sc"); a.href = "app.html?s=" + encodeURIComponent(sc.id); a.append(el("b", null, sc.shortTitle), el("span", null, `${sc.teams.length}개 부서 · ${sc.agenda.sources[0].outlet} ${sc.agenda.sources[0].date}`)); grid.append(a); });
+    items.forEach(sc => { const a = el("a", "sc"); a.href = "app.html?s=" + encodeURIComponent(sc.id) + (sc.focus ? "&role=" + encodeURIComponent(sc.focus) : ""); if (sc.focus) a.append(el("small", null, sc.focus + " 직무 특화")); a.append(el("b", null, sc.shortTitle), el("span", null, `${sc.teams.length}개 부서 · ${sc.agenda.sources[0].outlet} ${sc.agenda.sources[0].date}`)); grid.append(a); });
     list.append(sec);
   });
   const box = document.getElementById("agenda");
