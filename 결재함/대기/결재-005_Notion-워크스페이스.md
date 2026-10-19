@@ -5,6 +5,7 @@
 상신: CEO
 관련팀: CEO, 개발팀
 상태: 대기
+gmail_thread: 1a1537ff4603b091
 notion: https://app.notion.com/p/3fec6be7defa81da9444febc9a358cd2
 ---
 
