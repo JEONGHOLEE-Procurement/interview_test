@@ -1,0 +1,1183 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PT 면접 회의실</title>
+<script src="data/scenario-hyundai-india.js"></script>
+<script src="data/scenario-kia-cost.js"></script>
+<script src="data/scenario-kia-us.js"></script>
+<script src="data/scenario-kia-pbv.js"></script>
+<style>
+:root{
+  --bg:#0f1115; --panel:#171a21; --panel-2:#1f232c; --line:#2a2f3a; --text:#e8eaef; --muted:#9aa1ad;
+  --accent:#2d8cff; --ok:#3ccf7a; --warn:#f5b041; --danger:#ef5350; --floor:#232833; --table:#5b4636;
+  --radius:12px;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.5 var(--sans)}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:#7fb6ff}
+.hidden{display:none!important}
+
+/* ---------- 상단 바 ---------- */
+.topbar{height:48px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--line);background:#12151b}
+.topbar .rec{display:flex;align-items:center;gap:6px;color:var(--danger);font-weight:600;font-size:12px;flex:none}
+.topbar .rec::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--danger);animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+.topbar .title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .spacer{flex:1}
+.timer{white-space:nowrap;flex:none;font-variant-numeric:tabular-nums;background:var(--panel-2);padding:4px 10px;border-radius:8px;font-weight:600}
+.timer.warn{color:var(--warn)} .timer.over{color:var(--danger)}
+
+/* ---------- 단계 표시 ---------- */
+.steps{display:flex;gap:4px;padding:8px 16px;border-bottom:1px solid var(--line);overflow-x:auto;background:#12151b}
+.steps span{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--panel-2);color:var(--muted);white-space:nowrap}
+.steps span.on{background:var(--accent);color:#fff}
+.steps span.done{color:var(--ok)}
+
+/* ---------- 레이아웃 ---------- */
+.layout{display:grid;grid-template-columns:1fr 380px;height:calc(100% - 48px - 41px - 64px)}
+.stage{position:relative;overflow:hidden;background:#0b0d11;min-height:0}
+.side{border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.side-tabs{display:flex;border-bottom:1px solid var(--line)}
+.side-tabs button{flex:1;padding:10px;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted)}
+.side-tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+.side-body{flex:1;overflow:auto;padding:16px;min-height:0}
+
+/* ---------- 하단 컨트롤 ---------- */
+.controls{height:64px;display:flex;align-items:center;justify-content:center;gap:8px;border-top:1px solid var(--line);background:#12151b;padding:0 12px}
+.ctl{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:6px 12px;border-radius:8px;font-size:11px;color:var(--muted);min-width:64px}
+.ctl .ic{font-size:18px;line-height:1}
+.ctl:hover{background:var(--panel-2);color:var(--text)}
+.ctl.off .ic{opacity:.5}
+.ctl.leave{color:var(--danger)}
+
+/* ---------- 줌 화면 ---------- */
+.zoom{position:absolute;inset:0;display:flex;padding:12px;gap:12px}
+.gallery{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:8px}
+.share{flex:1;display:flex;flex-direction:column;min-width:0;padding-bottom:84px}
+.filmstrip{width:170px;display:flex;flex-direction:column;gap:6px;overflow:auto}
+.filmstrip .tile{height:96px;flex:none;min-height:0}
+.tile{position:relative;background:var(--panel-2);border-radius:10px;display:flex;align-items:center;justify-content:center;border:2px solid transparent;overflow:hidden;min-height:90px}
+.tile.speaking{border-color:var(--ok);box-shadow:0 0 0 2px rgba(60,207,122,.25)}
+.tile .face{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px;color:#fff}
+.tile .label{position:absolute;left:8px;bottom:6px;font-size:12px;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:6px;max-width:calc(100% - 16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .badge{position:absolute;right:8px;top:6px;font-size:11px;background:var(--accent);padding:1px 6px;border-radius:6px}
+.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+
+/* ---------- 슬라이드 (Investor Day 템플릿) ---------- */
+.deck-holder{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.deck-scaler{position:relative;flex:none;box-shadow:0 20px 60px rgba(0,0,0,.55);border-radius:6px;overflow:hidden}
+.deck{position:absolute;left:0;top:0;width:960px;height:540px;transform-origin:0 0;overflow:hidden;color:#fff;font-family:var(--sans);background:#04060a;user-select:none}
+.deck>div{position:absolute}
+.d-bg{position:absolute;inset:0;background:
+  radial-gradient(ellipse 60% 70% at 78% 28%,rgba(46,84,158,.30),transparent 60%),
+  radial-gradient(ellipse 50% 60% at 8% 95%,rgba(28,52,96,.28),transparent 60%),
+  linear-gradient(180deg,#070a11,#020308)}
+.d-bg::after{content:"";position:absolute;inset:0;opacity:.55;background-image:
+  radial-gradient(1px 1px at 12% 18%,#fff,transparent),radial-gradient(1px 1px at 34% 72%,#cfe0ff,transparent),
+  radial-gradient(1px 1px at 58% 14%,#fff,transparent),radial-gradient(1.5px 1.5px at 82% 62%,#dfe9ff,transparent),
+  radial-gradient(1px 1px at 91% 22%,#fff,transparent),radial-gradient(1px 1px at 46% 46%,#9fbfff,transparent),
+  radial-gradient(1px 1px at 22% 88%,#fff,transparent),radial-gradient(1px 1px at 70% 90%,#cfe0ff,transparent)}
+.d-dash{position:absolute;left:48px;top:50px;width:14px;height:2px;background:#fff}
+.d-nav{position:absolute;right:40px;top:26px;display:flex;gap:26px;font-size:12px;color:#525a6a;letter-spacing:.02em}
+.d-nav span{padding-bottom:6px;border-bottom:1px solid transparent}
+.d-nav span.on{color:#fff;font-weight:700;border-bottom-color:#3fa9ff}
+.d-page{position:absolute;right:40px;bottom:20px;font-size:11px;color:#7d8596}
+.d-foot{position:absolute;left:48px;bottom:20px;font-size:10px;color:#565e6e;max-width:600px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-sec{font-size:13px;color:#c9cdd6;margin-bottom:8px}
+.d-title{font-size:32px;font-weight:800;line-height:1.22;letter-spacing:-.02em;white-space:pre-line}
+.d-title.sm{font-size:25px;line-height:1.3}
+.d-desc{font-size:14px;color:#8f97a6;margin-top:14px;line-height:1.5;white-space:pre-line}
+.d-kpis{position:absolute;display:flex;flex-direction:column;gap:10px}
+.d-kpi{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 16px}
+.d-kpi b{display:block;font-size:24px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(90deg,#7cc4ff,#3f8cff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.d-kpi span{font-size:12px;color:#8f97a6}
+.d-chart{position:absolute}
+.d-unit{font-size:10px;color:#7d8596;margin-bottom:6px}
+.d-bars{display:flex;gap:16px;height:160px}
+.d-col{flex:1;display:flex;flex-direction:column;min-width:0}
+.d-track{position:relative;flex:1;border-bottom:1px solid rgba(255,255,255,.18)}
+.d-bar{position:absolute;left:20%;right:20%;border-radius:2px 2px 0 0;transition:height .6s ease,bottom .6s ease}
+.d-bar.base{background:linear-gradient(180deg,#3d4863,#252d40)}
+.d-bar.hl{background:linear-gradient(180deg,#56b4ff,#1f5fd6);box-shadow:0 0 22px rgba(63,169,255,.35)}
+.d-bar.pos{background:linear-gradient(180deg,#5cb8ff,#2b72e0)}
+.d-bar.neg{background:linear-gradient(180deg,#4b5268,#30364a)}
+.d-val{position:absolute;top:-19px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:700;white-space:nowrap}
+.d-xl{font-size:11px;color:#9aa1ad;text-align:center;margin-top:6px;line-height:1.25;height:28px;overflow:hidden}
+.d-points{position:absolute;display:flex;flex-direction:column;gap:12px}
+.d-points.big{gap:22px}
+.d-pt{display:flex;gap:12px;align-items:flex-start;font-size:16px;line-height:1.4}
+.d-points.big .d-pt{font-size:19px}
+.d-pt i{flex:none;width:26px;height:26px;border-radius:50%;font-style:normal;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#56b4ff,#1f5fd6)}
+.d-risk{position:absolute;display:flex;gap:12px;align-items:center;background:rgba(255,255,255,.045);border-left:3px solid #9be11e;padding:10px 14px;font-size:14px;color:#dfe3ea}
+.d-risk em{font-style:normal;font-size:10px;font-weight:800;color:#9be11e;letter-spacing:.1em}
+.d-facts{position:absolute;display:flex;flex-direction:column;gap:10px}
+.d-fact{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.45;color:#dfe3ea}
+.d-fact em{font-style:normal;color:#3fa9ff;font-size:11px;margin-left:6px}
+.rv{opacity:.07;transform:translateY(6px);transition:opacity .5s ease,transform .5s ease}
+.rv.on{opacity:1;transform:none}
+
+/* 편집 가능한 요소 */
+.el{position:absolute;display:flex;overflow:visible}
+.el-text{width:100%;white-space:pre-wrap;word-break:keep-all;line-height:1.3;outline:none;padding:2px 4px}
+.el.v-center{align-items:center}
+.el svg.shape{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.el.v-center .el-text{position:relative}
+.editing .el-text{cursor:text;user-select:text;-webkit-user-select:text;background:rgba(63,169,255,.08)}
+.sel-box{position:absolute;border:1px dashed #3fa9ff;pointer-events:none}
+.handle{position:absolute;background:#fff;border:2px solid #2d8cff;border-radius:2px;z-index:50}
+
+/* ---------- 편집기 ---------- */
+.editor{position:absolute;inset:0;display:flex;flex-direction:column;padding:10px 12px 12px;gap:8px}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+.toolbar .grp{display:flex;gap:4px;align-items:center;padding-right:8px;border-right:1px solid var(--line)}
+.toolbar .grp:last-child{border-right:0}
+.tb{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;min-width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.tb:hover{border-color:#3a4252}
+.tb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.tb:disabled{opacity:.35;cursor:not-allowed}
+.toolbar select,.toolbar input[type=number]{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;color:var(--text);height:30px;padding:0 6px;font:inherit;font-size:12px}
+.toolbar input[type=number]{width:56px}
+.toolbar label.c{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.toolbar input[type=color]{width:28px;height:28px;border:1px solid var(--line);border-radius:6px;background:none;padding:0}
+.toolbar :disabled{opacity:.35}
+
+/* ---------- 메타버스 회의실 ---------- */
+.meta{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.room{position:relative;width:1000px;height:640px;transform-origin:center center;background:
+  repeating-linear-gradient(0deg,transparent 0 39px,rgba(255,255,255,.035) 39px 40px),
+  repeating-linear-gradient(90deg,transparent 0 39px,rgba(255,255,255,.035) 39px 40px),var(--floor);
+  border:10px solid #343b48;border-radius:18px;box-shadow:inset 0 0 80px rgba(0,0,0,.5)}
+.room .screen{position:absolute;left:300px;top:-4px;width:400px;height:66px;background:#04060a;border:3px solid #4a5263;border-top:0;border-radius:0 0 8px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;color:#8f97a6;text-align:center;padding:0 12px}
+.room .screen b{color:#fff;font-size:13px}
+.room .table{position:absolute;left:300px;top:230px;width:400px;height:180px;border-radius:90px;background:linear-gradient(180deg,#6a5340,var(--table));box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 2px 0 rgba(255,255,255,.08)}
+.room .table::after{content:attr(data-label);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:13px;letter-spacing:.1em}
+.room .desk{position:absolute;left:380px;top:100px;width:240px;height:40px;border-radius:8px;background:#3b4252;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.room .deco{position:absolute;font-size:28px;opacity:.9}
+.room .door{position:absolute;left:-10px;top:520px;width:10px;height:70px;background:#8a6a4a}
+.room .wb{position:absolute;right:30px;top:180px;width:16px;height:220px;background:#e9edf2;border-radius:4px}
+.avatar{position:absolute;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:15px;border:3px solid rgba(255,255,255,.85);box-shadow:0 4px 10px rgba(0,0,0,.45);transition:left .12s linear,top .12s linear}
+.avatar .tag{position:absolute;top:50px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:600;white-space:nowrap;background:rgba(0,0,0,.6);padding:1px 7px;border-radius:6px}
+.avatar.speaking::before{content:"";position:absolute;inset:-9px;border-radius:50%;border:3px solid var(--ok);animation:pulse 1.2s infinite}
+@keyframes pulse{0%{transform:scale(.9);opacity:1}100%{transform:scale(1.25);opacity:0}}
+.avatar.me{border-color:var(--accent);z-index:5}
+.avatar.me .tag{background:var(--accent)}
+.avatar.seat-empty{opacity:.25;border-style:dashed}
+.bubble{position:absolute;z-index:10;max-width:280px;background:#fff;color:#111;padding:8px 12px;border-radius:12px;font-size:12px;line-height:1.45;box-shadow:0 6px 18px rgba(0,0,0,.4);transform:translate(-50%,calc(-100% - 34px));pointer-events:none}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-6px;width:12px;height:12px;background:#fff;transform:translateX(-50%) rotate(45deg)}
+.bubble b{display:block;font-size:11px;color:#555;margin-bottom:2px}
+.near-card{position:absolute;left:16px;right:16px;bottom:16px;max-width:560px;margin:0 auto;background:rgba(23,26,33,.96);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;z-index:20}
+.near-card h4{margin:0 0 4px;display:flex;gap:8px;align-items:center}
+.near-card .stance{font-size:12px;color:var(--warn)}
+.near-card p{margin:6px 0 0;color:#cfd4dd;font-size:13px}
+.meta-hint{position:absolute;left:16px;top:12px;font-size:12px;color:var(--muted);background:rgba(0,0,0,.4);padding:4px 10px;border-radius:8px;z-index:20}
+
+/* ---------- 자막 ---------- */
+.caption{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:min(760px,calc(100% - 32px));background:rgba(0,0,0,.8);border-radius:10px;padding:10px 14px;z-index:30;font-size:14px}
+.caption b{color:#9fd0ff;margin-right:6px}
+.meta-on .caption,.edit-on .caption{display:none}
+
+/* ---------- 사이드 패널 ---------- */
+.card{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px}
+.card h3{margin:0 0 6px;font-size:15px}
+.k{font-size:11px;color:var(--muted);letter-spacing:.04em;margin-bottom:4px}
+.mine{border-color:var(--accent);background:rgba(45,140,255,.08)}
+.facts{margin:0;padding-left:18px;color:#cfd4dd;font-size:13px}
+.facts li{margin-bottom:6px}
+.facts sup a{text-decoration:none;font-size:10px}
+.src{font-size:12px;color:var(--muted);padding-left:18px}
+.src li{margin-bottom:4px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.block{width:100%;margin-top:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-row{display:flex;gap:6px;margin-top:10px}
+.btn-row .btn{flex:1;padding:8px 6px;font-size:12px}
+.row{display:flex;gap:8px;align-items:center}
+label.f{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+input.t,textarea.t{width:100%;background:#0f1218;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit;resize:vertical}
+input.t:focus,textarea.t:focus{outline:2px solid var(--accent);border-color:transparent}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.log-item{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.log-item .who{font-weight:600;font-size:12px}
+.log-item .when{color:var(--muted);font-size:11px;margin-left:6px}
+.pressure{border-color:var(--danger);background:rgba(239,83,80,.08)}
+.prog{height:4px;background:#0f1218;border-radius:2px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:var(--ok);transition:width .3s}
+.tl{list-style:none;margin:0 0 12px;padding:0}
+.tl li{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.tl li .dot{width:10px;height:10px;border-radius:50%;flex:none}
+.tl li .st{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}
+.tl li.now .st{color:var(--ok);font-weight:700}
+details.team-talk{margin-top:6px}
+details.team-talk summary{cursor:pointer;font-size:13px;font-weight:600}
+details.team-talk p{margin:6px 0 0;font-size:13px;color:#cfd4dd}
+.score-row{margin-bottom:10px}
+.score-row .bar{height:8px;background:#0f1218;border-radius:4px;overflow:hidden;margin-top:4px}
+.score-row .bar i{display:block;height:100%;background:var(--accent)}
+.score-row .tip{font-size:12px;color:var(--muted);margin-top:3px}
+.total{font-size:32px;font-weight:700}
+kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:11px}
+
+/* ---------- 입장 화면 ---------- */
+.join{position:fixed;inset:0;background:radial-gradient(ellipse at top,#1a2333,#0b0d11 70%);z-index:100;overflow:auto;padding:32px 16px}
+.join-inner{max-width:1000px;margin:0 auto}
+.join h1{margin:0 0 4px;font-size:24px}
+.join .sub{color:var(--muted);margin:0 0 20px}
+.join h2{font-size:15px;margin:22px 0 4px}
+.sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px;margin-top:10px}
+.sc-card{text-align:left;background:var(--panel);border:2px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.sc-card.sel{border-color:var(--accent);background:rgba(45,140,255,.08)}
+.sc-card .co{font-size:11px;font-weight:700;color:#7fb6ff}
+.sc-card .nm{font-weight:700}
+.sc-card .ds{font-size:12px;color:var(--muted)}
+.agenda-box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-top:16px}
+.agenda-box h3{margin:4px 0 8px;font-size:18px}
+.team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin:12px 0 20px}
+.team-card{text-align:left;background:var(--panel);border:2px solid var(--line);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:6px}
+.team-card:hover{border-color:#3a4252}
+.team-card.sel{border-color:var(--accent);background:rgba(45,140,255,.08)}
+.team-card .nm{display:flex;align-items:center;gap:8px;font-weight:700}
+.team-card .dot{width:12px;height:12px;border-radius:50%}
+.team-card .pr{font-size:13px;color:#cfd4dd}
+.team-card.excluded{opacity:.45;cursor:not-allowed;border-style:dashed}
+.join-foot{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.join-foot .grow{flex:1;min-width:200px}
+.join-need{font-size:12px;color:var(--warn);margin-top:6px;min-height:18px}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;grid-template-rows:55% 45%}
+  .side{border-left:0;border-top:1px solid var(--line)}
+  .gallery{grid-template-columns:repeat(3,1fr)}
+  .filmstrip{display:none}
+  .ctl{min-width:48px;padding:6px 6px}
+  .ctl .tx{display:none}
+  .toolbar .grp{border-right:0;padding-right:0}
+}
+</style>
+</head>
+<body>
+
+<!-- 입장 화면 -->
+<section class="join" id="join">
+  <div class="join-inner">
+    <h1>PT 면접 대기실</h1>
+    <p class="sub">발제를 고르고, 지원 직무를 선택하면 회의실에 입장합니다.</p>
+    <h2>1. 발제 선택</h2>
+    <div class="sc-grid" id="scGrid"></div>
+    <div class="agenda-box" id="agendaBox"></div>
+    <h2>2. 지원 직무 선택</h2>
+    <div class="hint">고른 팀의 일원으로 회의에 들어갑니다. 같은 발제라도 팀마다 다른 화두를 받습니다.</div>
+    <div class="team-grid" id="teamGrid"></div>
+    <div class="join-foot">
+      <div class="grow">
+        <label class="f" for="nameInput">3. 이름 (화면 표시용)</label>
+        <input class="t" id="nameInput" maxlength="12" placeholder="예: 이지원">
+      </div>
+      <button class="btn primary" id="joinBtn">회의 입장</button>
+    </div>
+    <div class="join-need" id="joinNeed"></div>
+  </div>
+</section>
+
+<header class="topbar">
+  <span class="rec">REC</span>
+  <span class="title" id="meetingTitle">PT 면접</span>
+  <span class="spacer"></span>
+  <span class="timer" id="timer">--:--</span>
+</header>
+<nav class="steps" id="steps"></nav>
+
+<main class="layout">
+  <section class="stage" id="stage">
+    <!-- 줌 화면 -->
+    <div class="zoom" id="zoomView">
+      <div class="gallery" id="gallery"></div>
+      <div class="share hidden" id="share"><div class="deck-holder" id="shareHolder"></div></div>
+      <div class="filmstrip hidden" id="filmstrip"></div>
+    </div>
+    <!-- PPT 편집기 -->
+    <div class="editor hidden" id="editorView">
+      <div class="toolbar" id="toolbar">
+        <div class="grp">
+          <button class="tb" data-add="text" title="텍스트 상자">T 텍스트</button>
+          <button class="tb" data-add="rect" title="사각형">▭</button>
+          <button class="tb" data-add="round" title="둥근 사각형">▢</button>
+          <button class="tb" data-add="ellipse" title="원">◯</button>
+          <button class="tb" data-add="triangle" title="삼각형">△</button>
+          <button class="tb" data-add="line" title="선">╱</button>
+          <button class="tb" data-add="arrow" title="화살표">→</button>
+        </div>
+        <div class="grp">
+          <select id="fFont" title="글꼴">
+            <option value="sans">고딕</option><option value="serif">명조</option><option value="round">둥근고딕</option><option value="mono">고정폭</option><option value="display">영문 디스플레이</option>
+          </select>
+          <input type="number" id="fSize" min="8" max="120" title="글자 크기">
+          <button class="tb" id="fBold" title="굵게"><b>B</b></button>
+          <button class="tb" id="fItalic" title="기울임"><i>I</i></button>
+          <button class="tb" data-align="left" title="왼쪽 정렬">⇤</button>
+          <button class="tb" data-align="center" title="가운데 정렬">≡</button>
+          <button class="tb" data-align="right" title="오른쪽 정렬">⇥</button>
+          <label class="c" title="글자색">글자<input type="color" id="fColor"></label>
+        </div>
+        <div class="grp">
+          <label class="c" title="채우기 색">채우기<input type="color" id="fFill"></label>
+          <button class="tb" id="fGrad" title="템플릿 블루 그라데이션">그라데이션</button>
+          <button class="tb" id="fNoFill" title="채우기 없음">없음</button>
+          <label class="c" title="선 색">선<input type="color" id="fStroke"></label>
+          <select id="fStrokeW" title="선 두께"><option value="0">선 없음</option><option>1</option><option>2</option><option>3</option><option>4</option><option>6</option><option>8</option></select>
+          <select id="fDash" title="선 스타일"><option value="solid">실선</option><option value="dashed">점선</option></select>
+        </div>
+        <div class="grp">
+          <button class="tb" id="eUndo" title="실행 취소 (⌘Z)">↶</button>
+          <button class="tb" id="eDup" title="복제 (⌘D)">⧉</button>
+          <button class="tb" id="eFront" title="앞으로">⬆</button>
+          <button class="tb" id="eBack" title="뒤로">⬇</button>
+          <button class="tb" id="eDel" title="삭제 (Delete)">🗑</button>
+          <button class="tb" id="eReset" title="템플릿으로 초기화">초기화</button>
+        </div>
+      </div>
+      <div class="deck-holder" id="editorHolder"></div>
+    </div>
+    <!-- 메타버스 회의실 -->
+    <div class="meta hidden" id="metaView">
+      <div class="meta-hint">WASD·방향키 또는 클릭으로 이동 · 다른 팀 자리에 다가가면 그 팀의 주장이 보입니다</div>
+      <div class="room" id="room">
+        <div class="screen" id="roomScreen">발제 대기 중</div>
+        <div class="desk"></div>
+        <div class="table" id="roomTable"></div>
+        <div class="door"></div>
+        <div class="wb"></div>
+        <div class="deco" style="left:40px;top:40px">🪴</div>
+        <div class="deco" style="right:40px;top:40px">🪴</div>
+        <div class="deco" style="right:40px;bottom:30px">🗄️</div>
+      </div>
+      <div class="near-card hidden" id="nearCard"></div>
+    </div>
+    <div class="caption hidden" id="caption"></div>
+  </section>
+
+  <aside class="side">
+    <div class="side-tabs">
+      <button data-tab="act" class="on">진행</button>
+      <button data-tab="agenda">발제</button>
+      <button data-tab="log">회의록</button>
+    </div>
+    <div class="side-body" id="sideBody"></div>
+  </aside>
+</main>
+
+<footer class="controls">
+  <button class="ctl off" id="micBtn"><span class="ic">🎙️</span><span class="tx">마이크</span></button>
+  <button class="ctl off" id="camBtn"><span class="ic">📷</span><span class="tx">카메라</span></button>
+  <button class="ctl off" id="ttsBtn"><span class="ic">🔈</span><span class="tx">음성 듣기</span></button>
+  <button class="ctl" id="viewBtn"><span class="ic">🏢</span><span class="tx">회의실 전체 보기</span></button>
+  <button class="ctl leave" id="leaveBtn"><span class="ic">⏻</span><span class="tx">나가기</span></button>
+</footer>
+
+<script>
+(() => {
+"use strict";
+const ALL = window.SCENARIOS || [];
+let S = null;
+const $ = (s, root = document) => root.querySelector(s);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const at = (e, x, y, w, h) => { e.style.left = x + "px"; e.style.top = y + "px"; if (w != null) e.style.width = w + "px"; if (h != null) e.style.height = h + "px"; return e; };
+const SVGNS = "http://www.w3.org/2000/svg";
+const svg = (tag, attrs = {}) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+const W = 960, H = 540;
+
+const DEFAULT_RUBRIC = [
+  { id: "fit", label: "화두 적합성" }, { id: "evidence", label: "근거·수치" }, { id: "collab", label: "타 부서 고려" },
+  { id: "risk", label: "리스크·대안" }, { id: "structure", label: "구조·전달" },
+];
+const DEFAULT_COMMON = ["다른 부서 의견 중 가장 동의하기 어려운 것은 무엇이고, 어떻게 조율하겠습니까?", "입사 후 이 과제를 맡는다면 첫 30일 동안 무엇부터 하겠습니까?"];
+const FONTS = {
+  sans: 'var(--sans)', serif: '"AppleMyungjo","Nanum Myeongjo","Noto Serif KR",serif',
+  round: '"Arial Rounded MT Bold","BM JUA","Jua","Apple SD Gothic Neo",sans-serif', mono: 'Menlo,Consolas,monospace',
+  display: '"Avenir Next","Helvetica Neue",Arial,sans-serif',
+};
+
+/* ---------------- 상태 ---------------- */
+const PHASES = [
+  { id: "brief", label: "발제" }, { id: "meeting", label: "부서별 발표" }, { id: "prep", label: "내 PPT 만들기" },
+  { id: "present", label: "발표" }, { id: "rebuttal", label: "반박 대응" }, { id: "qa", label: "질의응답" }, { id: "result", label: "결과" },
+];
+const st = {
+  name: "", team: null, phase: null, phaseStartedAt: {}, startedAt: null,
+  view: "zoom", tab: "act", speakerId: null, presented: new Set(), log: [],
+  script: "", scriptSource: "typed", presentSeconds: 0,
+  rebuttal: null, qa: [], qaIndex: 0,
+  me: { x: 0, y: 0 }, visited: new Set(), tts: false, mic: null, cam: null, timer: null,
+};
+const MT = { queue: [], team: null, step: 0, auto: true, timer: null };   // 부서별 발표 진행
+const ED = { els: [], sel: null, hist: [], editing: null, lastDown: null }; // 내 PPT 편집기
+
+const SEATS = [ {x:380,y:198},{x:500,y:198},{x:620,y:198},{x:380,y:442},{x:500,y:442},{x:620,y:442} ];
+const IV_SEATS = [ {x:450,y:80},{x:550,y:80} ];
+const TABLE = { x1:300, y1:230, x2:700, y2:410 };
+const teamById = id => S.teams.find(t => t.id === id);
+const myTeam = () => teamById(st.team);
+const initials = s => s.replace(/(책임|매니저|상무|실장|면접관)/g, "").trim().slice(0, 1) || "?";
+const footnote = () => `※ 출처: ${S.agenda.sources.map(s => `${s.outlet} ${s.title.length > 26 ? s.title.slice(0, 26) + "…" : s.title}`).join(" / ")} · '(가정)'은 팀 가정치`;
+
+/* ================= 입장 화면 ================= */
+function renderJoin(){
+  const sg = $("#scGrid"); sg.innerHTML = "";
+  ALL.forEach(sc => {
+    const b = el("button", "sc-card" + (sc === S ? " sel" : ""));
+    b.append(el("span", "co", sc.company.name), el("span", "nm", sc.shortTitle), el("span", "ds", `${sc.agenda.sources[0].outlet} · ${sc.agenda.sources[0].date}`));
+    b.onclick = () => { S = sc; st.team = null; renderJoin(); };
+    sg.append(b);
+  });
+  const ab = $("#agendaBox"); ab.innerHTML = "";
+  ab.append(el("div", "k", `${S.company.name} · ${S.company.interviewType} · 준비 ${S.agenda.prepMinutes}분 · 발표 ${Math.round(S.agenda.speakSeconds / 60)}분`), el("h3", null, S.agenda.title), el("div", null, S.agenda.situation));
+  const grid = $("#teamGrid"); grid.innerHTML = "";
+  S.teams.forEach(t => {
+    const b = el("button", "team-card" + (st.team === t.id ? " sel" : ""));
+    const nm = el("div", "nm"), dot = el("span", "dot"); dot.style.background = t.color;
+    nm.append(dot, document.createTextNode(t.name));
+    b.append(nm, el("div", "pr", "화두 · " + t.prompt));
+    b.onclick = () => { st.team = t.id; renderJoin(); };
+    grid.append(b);
+  });
+  S.excludedTeams.forEach(x => { const b = el("div", "team-card excluded"); b.append(el("div", "nm", x.name + " — 이번 발제 제외"), el("div", "pr", x.reason)); grid.append(b); });
+  checkJoin();
+}
+const nameInput = $("#nameInput");
+nameInput.oninput = checkJoin;
+function checkJoin(){
+  const need = [!st.team && "직무를 선택하세요", !nameInput.value.trim() && "이름을 입력하세요"].filter(Boolean);
+  $("#joinBtn").disabled = need.length > 0;
+  $("#joinNeed").textContent = need.length ? "입장하려면: " + need.join(" · ") : "";
+}
+nameInput.addEventListener("keydown", e => { if (e.key === "Enter" && !$("#joinBtn").disabled) $("#joinBtn").click(); });
+$("#joinBtn").onclick = () => {
+  st.name = nameInput.value.trim(); st.startedAt = new Date().toISOString();
+  $("#join").classList.add("hidden");
+  $("#meetingTitle").textContent = `${S.company.name} · ${S.agenda.title}`;
+  $("#roomTable").dataset.label = S.tableLabel || "PT 회의";
+  const mySeat = SEATS[myTeam().seat];
+  st.me = { x: mySeat.x, y: mySeat.y + (mySeat.y < 300 ? -46 : 46) };
+  ED.els = templateElements();
+  buildRoom();
+  setPhase("brief");
+  say("iv1", `${st.name}님 반갑습니다. ${S.company.name} PT 면접을 시작하겠습니다. 화면에 띄운 발제를 확인하시고, ${myTeam().name} 입장에서 화두를 준비해 주세요.`);
+};
+
+/* ================= 단계 ================= */
+function renderSteps(){
+  const nav = $("#steps"); nav.innerHTML = "";
+  const cur = PHASES.findIndex(p => p.id === st.phase);
+  PHASES.forEach((p, i) => nav.append(el("span", i === cur ? "on" : i < cur ? "done" : "", `${i + 1}. ${p.label}`)));
+}
+function setPhase(p){
+  st.phase = p; st.phaseStartedAt[p] = Date.now();
+  stopTimer(); clearTimeout(MT.timer); renderSteps(); st.tab = "act"; renderTabs();
+  if (p !== "prep") { commitEdit(); ED.sel = null; }
+  if (p === "brief") startTimer(S.agenda.prepMinutes * 60, "준비");
+  if (p === "meeting") return startMeeting();
+  if (p === "prep") { st.speakerId = "me"; hideCaption(); startTimer(S.agenda.prepMinutes * 60, "준비"); }
+  if (p === "present") { st.speakerId = "me"; startTimer(S.agenda.speakSeconds, "발표"); }
+  if (p === "rebuttal") { startRebuttal(); return renderSide(); }
+  if (p === "qa") return startQA();
+  if (p === "result") { st.speakerId = null; hideCaption(); }
+  renderSide(); renderStage();
+}
+
+/* ================= 타이머 ================= */
+function startTimer(seconds, label){
+  stopTimer();
+  const end = Date.now() + seconds * 1000, t = $("#timer");
+  const tick = () => {
+    const left = Math.round((end - Date.now()) / 1000), a = Math.abs(left);
+    t.textContent = `${label} ${left < 0 ? "+" : ""}${String(Math.floor(a / 60)).padStart(2, "0")}:${String(a % 60).padStart(2, "0")}`;
+    t.className = "timer" + (left < 0 ? " over" : left <= 30 ? " warn" : "");
+  };
+  tick(); st.timer = setInterval(tick, 500);
+}
+function stopTimer(){ clearInterval(st.timer); $("#timer").textContent = "--:--"; $("#timer").className = "timer"; }
+const elapsed = p => Math.round((Date.now() - (st.phaseStartedAt[p] || Date.now())) / 1000);
+
+/* ================= 발언 / 자막 / 회의록 ================= */
+function who(id){
+  if (id === "me") return { name: st.name, team: myTeam().name, color: "#2d8cff" };
+  const iv = S.interviewers.find(i => i.id === id); if (iv) return { name: iv.name, team: iv.title, color: iv.color };
+  const t = teamById(id); return { name: t.npc.name, team: t.name, color: t.color };
+}
+let typing = null, sayToken = 0;
+function say(id, text, kind = "speech", onDone){
+  const token = ++sayToken;
+  st.speakerId = id; const w = who(id);
+  st.log.push({ at: new Date().toISOString(), speakerId: id, speaker: w.name, team: w.team, kind, text });
+  const c = $("#caption"); c.classList.remove("hidden"); c.innerHTML = "";
+  const span = el("span"); c.append(el("b", null, `${w.name} (${w.team})`), span);
+  let typed = false, spoken = !(st.tts && "speechSynthesis" in window);
+  const finish = () => { if (typed && spoken && token === sayToken && onDone) onDone(); };
+  clearInterval(typing); let i = 0;
+  typing = setInterval(() => { span.textContent = text.slice(0, i += 2); if (i >= text.length) { clearInterval(typing); typed = true; finish(); } }, 22);
+  if (!spoken) {
+    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "ko-KR"; u.rate = 1.1;
+    u.onend = u.onerror = () => { spoken = true; finish(); }; speechSynthesis.speak(u);
+  }
+  renderStage(text);
+}
+function hideCaption(){ $("#caption").classList.add("hidden"); clearInterval(typing); sayToken++; if ("speechSynthesis" in window) speechSynthesis.cancel(); }
+
+/* ================= 부서별 발표 (단계별 진행) ================= */
+function startMeeting(){ MT.queue = S.teams.filter(t => t.id !== st.team).map(t => t.id); nextTeam(); }
+function nextTeam(){
+  clearTimeout(MT.timer);
+  const id = MT.queue.shift();
+  if (!id) {
+    MT.team = null;
+    say("iv1", `각 부서 발표 잘 들었습니다. 이제 ${myTeam().name} 차례입니다. 다른 부서 주장을 고려해 1장짜리 PPT를 직접 만들어 주세요.`);
+    return renderSide();
+  }
+  MT.team = id; MT.step = 0; st.presented.add(id); playStep();
+}
+function playStep(){
+  clearTimeout(MT.timer);
+  const t = teamById(MT.team);
+  say(MT.team, t.npc.talk[MT.step], "presentation", scheduleNext);
+  renderSide();
+}
+function scheduleNext(){
+  if (!MT.auto || st.phase !== "meeting") return;
+  const len = teamById(MT.team).npc.talk[MT.step].length;
+  MT.timer = setTimeout(advance, st.tts ? 700 : Math.min(5500, 1600 + len * 35));
+}
+function advance(){
+  const t = teamById(MT.team); if (!t) return;
+  if (MT.step < t.npc.talk.length - 1) { MT.step++; playStep(); } else nextTeam();
+}
+
+/* ================= 반박 / 질의응답 ================= */
+function startRebuttal(){
+  const c = S.conflicts[st.team];
+  st.rebuttal = { from: c.from, prompt: c.text, answer: "", seconds: 0 };
+  say(c.from, c.text, "rebuttal");
+  startTimer(60, "반박 답변");
+}
+function startQA(){
+  const own = S.followUps[st.team] || [], common = S.followUps.common || DEFAULT_COMMON;
+  st.qa = [ { by: "iv1", q: own[0] }, { by: "iv2", q: common[Math.floor(Math.random() * common.length)] } ].filter(x => x.q).map(x => ({ ...x, answer: "", seconds: 0 }));
+  st.qaIndex = 0; askQ();
+}
+function askQ(){
+  const q = st.qa[st.qaIndex]; if (!q) return setPhase("result");
+  q.askedAt = Date.now(); say(q.by, q.q, "question"); startTimer(90, "답변"); renderSide();
+}
+
+/* ================= 슬라이드 공통 (Investor Day 템플릿) ================= */
+function mountDeck(holder){
+  holder.innerHTML = "";
+  const scaler = el("div", "deck-scaler"), deck = el("div", "deck");
+  scaler.append(deck); holder.append(scaler); fitDeck(holder);
+  if (!holder._ro) { holder._ro = new ResizeObserver(() => fitDeck(holder)); holder._ro.observe(holder); }
+  return deck;
+}
+function fitDeck(holder){
+  const scaler = holder.querySelector(".deck-scaler"), deck = holder.querySelector(".deck"); if (!deck) return;
+  const k = Math.max(0.1, Math.min(holder.clientWidth / W, holder.clientHeight / H));
+  scaler.style.width = W * k + "px"; scaler.style.height = H * k + "px";
+  deck.style.transform = `scale(${k})`; deck.dataset.k = k;
+}
+function chrome(deck, { nav = [], active = -1, page = "", foot = "" }){
+  deck.append(el("div", "d-bg"), el("div", "d-dash"));
+  if (nav.length) { const n = el("div", "d-nav"); nav.forEach((t, i) => n.append(el("span", i === active ? "on" : "", t))); deck.append(n); }
+  if (page) deck.append(el("div", "d-page", page));
+  if (foot) deck.append(el("div", "d-foot", foot));
+}
+const fmt = v => (Math.round(v * 100) / 100).toLocaleString("ko-KR");
+function drawChart(box, ch){
+  box.append(el("div", "d-unit", `(단위: ${ch.unit})`));
+  const area = el("div", "d-bars"); box.append(area);
+  let cols;
+  if (ch.type === "waterfall") {
+    let cum = ch.start.value; cols = [{ label: ch.start.label, lo: 0, hi: cum, txt: fmt(cum), kind: "base" }];
+    ch.steps.forEach(s => { cols.push({ label: s.label, lo: Math.min(cum, cum + s.value), hi: Math.max(cum, cum + s.value), txt: (s.value > 0 ? "+" : "") + fmt(s.value), kind: s.value < 0 ? "neg" : "pos" }); cum += s.value; });
+    cols.push({ label: ch.end.label, lo: 0, hi: ch.end.value, txt: fmt(ch.end.value), kind: "hl" });
+  } else cols = ch.items.map(it => ({ label: it.label, lo: 0, hi: it.value, txt: fmt(it.value), kind: it.hl ? "hl" : "base" }));
+  const max = Math.max(...cols.map(c => c.hi)) * 1.15;
+  cols.forEach(c => {
+    const col = el("div", "d-col"), track = el("div", "d-track"), bar = el("div", "d-bar " + c.kind);
+    bar.style.bottom = (c.lo / max * 100) + "%"; bar.style.height = Math.max(1.5, (c.hi - c.lo) / max * 100) + "%";
+    bar.append(el("div", "d-val", c.txt)); track.append(bar); col.append(track, el("div", "d-xl", c.label)); area.append(col);
+  });
+}
+function renderAgendaSlide(holder){
+  const d = mountDeck(holder);
+  chrome(d, { nav: ["발제", "직무별 화두", "부서별 발표", "내 발표"], active: 0, page: `${S.company.name} · ${S.company.interviewType}`, foot: footnote() });
+  const L = at(el("div"), 48, 64, 400);
+  L.append(el("div", "d-sec", "오늘의 발제"), el("div", "d-title sm", S.agenda.title), el("div", "d-desc", S.agenda.question));
+  d.append(L);
+  const F = at(el("div", "d-facts"), 490, 72, 420);
+  S.agenda.facts.slice(0, 5).forEach(f => { const r = el("div", "d-fact", f.text); if (f.ref) r.append(el("em", null, f.ref)); F.append(r); });
+  d.append(F);
+}
+function renderNpcSlide(holder, team, step){
+  const d = mountDeck(holder), sl = team.npc.slide, rv = i => "rv" + (i <= step ? " on" : "");
+  chrome(d, { nav: ["1. 핵심 메시지", "2. 근거", "3. 실행 방안", "4. 리스크"], active: step, page: `${String(team.seat + 1).padStart(2, "0")}  |  ${team.name}`, foot: footnote() });
+  const L = at(el("div", rv(0)), 48, 64, 300);
+  L.append(el("div", "d-sec", sl.section), el("div", "d-title", sl.title), el("div", "d-desc", sl.desc));
+  d.append(L);
+  const K = at(el("div", "d-kpis " + rv(1)), 48, 262, 290);
+  (sl.kpis || []).forEach(k => { const c = el("div", "d-kpi"); c.append(el("b", null, k.value), el("span", null, k.label)); K.append(c); });
+  d.append(K);
+  let y = 84;
+  if (sl.chart) { const C = at(el("div", "d-chart " + rv(1)), 386, 70, 520); drawChart(C, sl.chart); d.append(C); y = 290; }
+  const P = at(el("div", "d-points " + (sl.chart ? "" : "big ") + rv(2)), 386, y, 520);
+  sl.points.forEach((p, i) => { const r = el("div", "d-pt"); r.append(el("i", null, String(i + 1)), el("span", null, p)); P.append(r); });
+  d.append(P);
+  const R = at(el("div", "d-risk " + rv(3)), 386, sl.chart ? 440 : 410, 520);
+  R.append(el("em", null, "RISK"), el("span", null, sl.risk)); d.append(R);
+}
+
+/* ================= 편집 가능한 슬라이드 요소 ================= */
+let uid = 0;
+const mk = (o) => ({ id: "e" + (++uid), font: "sans", size: 16, color: "#ffffff", bold: false, italic: false, align: "left", fill: "", stroke: "", strokeWidth: 0, dash: "solid", radius: 0, text: "", role: "free", ...o });
+function templateElements(){
+  const t = myTeam(), E = [];
+  E.push(mk({ type: "text", role: "section", x: 44, y: 62, w: 300, h: 24, size: 13, color: "#c9cdd6", text: `${t.name} 제안` }));
+  E.push(mk({ type: "text", role: "title", x: 44, y: 88, w: 320, h: 88, size: 30, bold: true, text: "[결론을 한두 줄로\n입력하세요]" }));
+  E.push(mk({ type: "text", role: "desc", x: 44, y: 184, w: 300, h: 46, size: 14, color: "#8f97a6", text: "[화두에 대한 한 줄 요약]" }));
+  [0, 1].forEach(i => {
+    E.push(mk({ type: "rect", role: "deco", x: 48, y: 252 + i * 84, w: 290, h: 72, radius: 10, fill: "#121722", stroke: "#2a3346", strokeWidth: 1 }));
+    E.push(mk({ type: "text", role: "kpi", x: 60, y: 258 + i * 84, w: 270, h: 34, size: 24, bold: true, color: "#5cb3ff", text: "[핵심 수치]" }));
+    E.push(mk({ type: "text", role: "kpiLabel", x: 60, y: 292 + i * 84, w: 270, h: 22, size: 12, color: "#8f97a6", text: "[수치 설명]" }));
+  });
+  [0, 1, 2].forEach(i => {
+    E.push(mk({ type: "ellipse", role: "deco", x: 386, y: 92 + i * 80, w: 28, h: 28, fill: "grad", size: 13, bold: true, align: "center", text: String(i + 1) }));
+    E.push(mk({ type: "text", role: "point", x: 424, y: 88 + i * 80, w: 490, h: 60, size: 18, text: "[핵심 실행 방안]" }));
+  });
+  E.push(mk({ type: "rect", role: "deco", x: 386, y: 352, w: 528, h: 70, fill: "#14181f" }));
+  E.push(mk({ type: "rect", role: "deco", x: 386, y: 352, w: 4, h: 70, fill: "#9be11e" }));
+  E.push(mk({ type: "text", role: "risk", x: 400, y: 360, w: 505, h: 56, size: 14, color: "#dfe3ea", text: "리스크 · [예상 리스크와 대응책]" }));
+  E.push(mk({ type: "text", role: "ask", x: 386, y: 436, w: 528, h: 44, size: 13, color: "#c9cdd6", text: "협조 요청 · [다른 부서에 요청할 것]" }));
+  return E;
+}
+function boxStyle(node, e){
+  at(node, e.x, e.y, e.w, e.h);
+  const t = el("div", "el-text"); t.textContent = e.text || "";
+  Object.assign(t.style, { fontFamily: FONTS[e.font] || FONTS.sans, fontSize: e.size + "px", color: e.color, fontWeight: e.bold ? 800 : 400, fontStyle: e.italic ? "italic" : "normal", textAlign: e.align });
+  return t;
+}
+const paint = (v, gid) => v === "grad" ? `url(#${gid})` : (v || "none");
+function gradDefs(s, gid){
+  const defs = svg("defs"), g = svg("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
+  g.append(svg("stop", { offset: "0%", "stop-color": "#56b4ff" }), svg("stop", { offset: "100%", "stop-color": "#1f5fd6" }));
+  defs.append(g); s.append(defs);
+}
+let gradSeq = 0;
+function renderElement(e){
+  if (e.type === "line" || e.type === "arrow") return lineNode(e);
+  const node = el("div", "el" + (e.type === "text" ? "" : " v-center"));
+  const t = boxStyle(node, e);
+  if (e.type !== "text" || e.fill || e.strokeWidth) {
+    const gid = "g" + (++gradSeq);
+    const s = svg("svg", { class: "shape", viewBox: `0 0 ${Math.max(1, e.w)} ${Math.max(1, e.h)}`, preserveAspectRatio: "none" }); gradDefs(s, gid);
+    const sw = e.strokeWidth || 0, common = { fill: paint(e.fill, gid), stroke: sw ? e.stroke || "#ffffff" : "none", "stroke-width": sw, "vector-effect": "non-scaling-stroke", "stroke-dasharray": e.dash === "dashed" ? "6 4" : "" };
+    let shape;
+    if (e.type === "ellipse") shape = svg("ellipse", { cx: e.w / 2, cy: e.h / 2, rx: Math.max(0, e.w / 2 - sw / 2), ry: Math.max(0, e.h / 2 - sw / 2), ...common });
+    else if (e.type === "triangle") shape = svg("polygon", { points: `${e.w / 2},${sw} ${e.w - sw},${e.h - sw} ${sw},${e.h - sw}`, ...common });
+    else shape = svg("rect", { x: sw / 2, y: sw / 2, width: Math.max(0, e.w - sw), height: Math.max(0, e.h - sw), rx: e.radius || 0, ...common });
+    s.append(shape); node.append(s);
+  }
+  node.append(t); node.dataset.id = e.id;
+  return node;
+}
+function lineNode(e){
+  const pad = 14, x1 = e.x, y1 = e.y, x2 = e.x + e.w, y2 = e.y + e.h;
+  const minx = Math.min(x1, x2) - pad, miny = Math.min(y1, y2) - pad, bw = Math.abs(e.w) + pad * 2, bh = Math.abs(e.h) + pad * 2;
+  const s = svg("svg", { width: bw, height: bh, class: "el" }); s.style.position = "absolute"; s.style.left = minx + "px"; s.style.top = miny + "px"; s.style.overflow = "visible";
+  const a = { x: x1 - minx, y: y1 - miny }, b = { x: x2 - minx, y: y2 - miny };
+  const sw = Math.max(1, e.strokeWidth || 2), color = e.stroke || "#ffffff";
+  const ang = Math.atan2(b.y - a.y, b.x - a.x), head = 7 + sw * 2;
+  const end = e.type === "arrow" ? { x: b.x - Math.cos(ang) * head * .8, y: b.y - Math.sin(ang) * head * .8 } : b;
+  s.append(svg("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: "transparent", "stroke-width": 16 }));
+  s.append(svg("line", { x1: a.x, y1: a.y, x2: end.x, y2: end.y, stroke: color, "stroke-width": sw, "stroke-linecap": "round", "stroke-dasharray": e.dash === "dashed" ? "8 6" : "" }));
+  if (e.type === "arrow") {
+    const p = (r, d) => `${b.x - Math.cos(ang + r) * d},${b.y - Math.sin(ang + r) * d}`;
+    s.append(svg("polygon", { points: `${b.x},${b.y} ${p(0.45, head)} ${p(-0.45, head)}`, fill: color }));
+  }
+  s.dataset.id = e.id; return s;
+}
+function renderPlayerSlide(holder){
+  const d = mountDeck(holder);
+  chrome(d, { nav: ["1. 결론", "2. 근거", "3. 실행", "4. 리스크"], page: `${myTeam().name}  |  ${st.name}`, foot: footnote() });
+  ED.els.forEach(e => d.append(renderElement(e)));
+  return d;
+}
+const elText = role => ED.els.filter(e => e.role === role).map(e => e.text || "");
+const filled = s => !!s && !/\[[^\]]*\]/.test(s) && s.replace(/^(리스크|협조 요청)\s*·\s*/, "").trim().length >= 4;
+const slideTitle = () => (elText("title")[0] || "").replace(/\n/g, " ");
+
+/* ================= PPT 편집기 ================= */
+function renderEditor(){
+  const holder = $("#editorHolder"), d = renderPlayerSlide(holder);
+  d.addEventListener("pointerdown", ev => { if (ev.target === d || ev.target.classList.contains("d-bg")) { commitEdit(); ED.sel = null; renderEditor(); } });
+  d.querySelectorAll("[data-id]").forEach(node => bindEl(node, ED.els.find(e => e.id === node.dataset.id)));
+  if (ED.editing) {
+    const node = d.querySelector(`[data-id="${ED.editing}"] .el-text`);
+    if (node) {
+      node.parentElement.classList.add("editing"); node.contentEditable = "true";
+      node.addEventListener("blur", commitEdit);
+      node.addEventListener("keydown", ev => { if (ev.key === "Escape") { ev.preventDefault(); node.blur(); } ev.stopPropagation(); });
+      node.focus(); const r = document.createRange(); r.selectNodeContents(node); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    }
+  }
+  const sel = ED.els.find(e => e.id === ED.sel);
+  if (sel) drawHandles(d, sel);
+  syncToolbar(); renderRoomScreen();
+}
+function bindEl(node, e){
+  node.style.cursor = "move";
+  node.addEventListener("pointerdown", ev => {
+    if (ED.editing === e.id) return;
+    ev.preventDefault(); ev.stopPropagation();
+    const now = Date.now(), isLine = e.type === "line" || e.type === "arrow";
+    if (!isLine && ED.lastDown && ED.lastDown.id === e.id && now - ED.lastDown.t < 400) { ED.lastDown = null; return startEdit(e.id); }
+    ED.lastDown = { id: e.id, t: now };
+    commitEdit(); ED.sel = e.id; renderEditor(); startDrag(ev, e, "move");
+  });
+}
+function drawHandles(d, e){
+  const k = +d.dataset.k || 1, hs = 10 / k;
+  const handle = (x, y, mode, cursor) => { const h = at(el("div", "handle"), x - hs / 2, y - hs / 2, hs, hs); h.style.cursor = cursor; h.addEventListener("pointerdown", ev => { ev.preventDefault(); ev.stopPropagation(); startDrag(ev, e, mode); }); d.append(h); };
+  if (e.type === "line" || e.type === "arrow") { handle(e.x, e.y, "p1", "crosshair"); handle(e.x + e.w, e.y + e.h, "p2", "crosshair"); return; }
+  d.append(at(el("div", "sel-box"), e.x - 1, e.y - 1, e.w + 2, e.h + 2));
+  handle(e.x, e.y, "nw", "nwse-resize"); handle(e.x + e.w, e.y, "ne", "nesw-resize");
+  handle(e.x, e.y + e.h, "sw", "nesw-resize"); handle(e.x + e.w, e.y + e.h, "se", "nwse-resize");
+}
+function startDrag(ev, e, mode){
+  const d = $("#editorHolder .deck"), k = +d.dataset.k || 1, sx = ev.clientX, sy = ev.clientY, o = { ...e };
+  let pushed = false;
+  const move = m => {
+    const dx = Math.round((m.clientX - sx) / k), dy = Math.round((m.clientY - sy) / k);
+    if (!pushed) { if (Math.abs(dx) + Math.abs(dy) < 2) return; pushHist(o); pushed = true; }
+    const min = 12;
+    if (mode === "move") { e.x = o.x + dx; e.y = o.y + dy; }
+    else if (mode === "p1") { e.x = o.x + dx; e.y = o.y + dy; e.w = o.w - dx; e.h = o.h - dy; }
+    else if (mode === "p2") { e.w = o.w + dx; e.h = o.h + dy; }
+    else {
+      if (mode.includes("e")) e.w = Math.max(min, o.w + dx);
+      if (mode.includes("s")) e.h = Math.max(min, o.h + dy);
+      if (mode.includes("w")) { e.w = Math.max(min, o.w - dx); e.x = o.x + o.w - e.w; }
+      if (mode.includes("n")) { e.h = Math.max(min, o.h - dy); e.y = o.y + o.h - e.h; }
+    }
+    renderEditor();
+  };
+  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+  window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+}
+function pushHist(prevEl){
+  const snap = ED.els.map(x => (prevEl && x.id === prevEl.id ? { ...prevEl } : { ...x }));
+  ED.hist.push(JSON.stringify(snap)); if (ED.hist.length > 80) ED.hist.shift();
+}
+function undo(){ const s = ED.hist.pop(); if (!s) return; ED.els = JSON.parse(s); ED.sel = null; ED.editing = null; renderEditor(); renderSide(); }
+function startEdit(id){ pushHist(); ED.sel = id; ED.editing = id; renderEditor(); }
+function commitEdit(){
+  if (!ED.editing) return;
+  const id = ED.editing, node = document.querySelector(`#editorHolder [data-id="${id}"] .el-text`), e = ED.els.find(x => x.id === id);
+  ED.editing = null;
+  if (node && e) e.text = node.innerText.replace(/\n$/, "");
+  if (st.phase === "prep") { renderEditor(); renderSide(); }
+}
+function addElement(kind){
+  commitEdit(); pushHist();
+  const presets = {
+    text: { type: "text", w: 240, h: 40, size: 18, text: "텍스트를 입력하세요" },
+    rect: { type: "rect", w: 160, h: 90, fill: "#1f2a40", stroke: "#3fa9ff", strokeWidth: 1, align: "center" },
+    round: { type: "rect", w: 160, h: 90, radius: 14, fill: "grad", align: "center", bold: true },
+    ellipse: { type: "ellipse", w: 100, h: 100, fill: "#1f2a40", stroke: "#3fa9ff", strokeWidth: 2, align: "center" },
+    triangle: { type: "triangle", w: 100, h: 90, fill: "#9be11e", align: "center", color: "#04060a" },
+    line: { type: "line", w: 200, h: 0, stroke: "#ffffff", strokeWidth: 2 },
+    arrow: { type: "arrow", w: 200, h: 0, stroke: "#3fa9ff", strokeWidth: 3 },
+  };
+  const e = mk({ ...presets[kind], x: 400, y: 220 }); ED.els.push(e); ED.sel = e.id;
+  if (kind === "text") { ED.editing = e.id; } renderEditor();
+}
+const selEl = () => ED.els.find(e => e.id === ED.sel);
+function setProp(k, v){ const e = selEl(); if (!e) return; commitEdit(); pushHist(); e[k] = v; renderEditor(); }
+function syncToolbar(){
+  const e = selEl(), isLine = !!e && (e.type === "line" || e.type === "arrow");
+  ["#fFont", "#fSize", "#fBold", "#fItalic", "#fColor"].forEach(s => $(s).disabled = !e || isLine);
+  document.querySelectorAll("[data-align]").forEach(b => b.disabled = !e || isLine);
+  ["#fFill", "#fGrad", "#fNoFill"].forEach(s => $(s).disabled = !e || isLine);
+  ["#fStroke", "#fStrokeW", "#fDash", "#eDup", "#eFront", "#eBack", "#eDel"].forEach(s => $(s).disabled = !e);
+  $("#eUndo").disabled = !ED.hist.length;
+  if (!e) return;
+  const hex = (v, d) => /^#[0-9a-f]{6}$/i.test(v || "") ? v : d;
+  $("#fFont").value = e.font; $("#fSize").value = e.size;
+  $("#fBold").classList.toggle("on", !!e.bold); $("#fItalic").classList.toggle("on", !!e.italic);
+  document.querySelectorAll("[data-align]").forEach(b => b.classList.toggle("on", e.align === b.dataset.align));
+  $("#fColor").value = hex(e.color, "#ffffff"); $("#fFill").value = hex(e.fill, "#1f2a40");
+  $("#fGrad").classList.toggle("on", e.fill === "grad");
+  $("#fStroke").value = hex(e.stroke, "#ffffff");
+  $("#fStrokeW").value = String(e.strokeWidth || 0); $("#fDash").value = e.dash || "solid";
+}
+document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => addElement(b.dataset.add));
+$("#fFont").onchange = ev => setProp("font", ev.target.value);
+$("#fSize").onchange = ev => setProp("size", Math.max(8, Math.min(120, +ev.target.value || 16)));
+$("#fBold").onclick = () => { const e = selEl(); if (e) setProp("bold", !e.bold); };
+$("#fItalic").onclick = () => { const e = selEl(); if (e) setProp("italic", !e.italic); };
+document.querySelectorAll("[data-align]").forEach(b => b.onclick = () => setProp("align", b.dataset.align));
+$("#fColor").onchange = ev => setProp("color", ev.target.value);
+$("#fFill").onchange = ev => setProp("fill", ev.target.value);
+$("#fGrad").onclick = () => setProp("fill", "grad");
+$("#fNoFill").onclick = () => setProp("fill", "");
+$("#fStroke").onchange = ev => { const e = selEl(); if (!e) return; pushHist(); e.stroke = ev.target.value; if (!e.strokeWidth) e.strokeWidth = 2; renderEditor(); };
+$("#fStrokeW").onchange = ev => setProp("strokeWidth", +ev.target.value);
+$("#fDash").onchange = ev => setProp("dash", ev.target.value);
+$("#eUndo").onclick = undo;
+$("#eDup").onclick = () => { const e = selEl(); if (!e) return; pushHist(); const c = { ...e, id: "e" + (++uid), x: e.x + 16, y: e.y + 16, role: "free" }; ED.els.push(c); ED.sel = c.id; renderEditor(); };
+$("#eFront").onclick = () => { const e = selEl(); if (!e) return; pushHist(); ED.els = ED.els.filter(x => x !== e).concat(e); renderEditor(); };
+$("#eBack").onclick = () => { const e = selEl(); if (!e) return; pushHist(); ED.els = [e].concat(ED.els.filter(x => x !== e)); renderEditor(); };
+$("#eDel").onclick = () => { const e = selEl(); if (!e) return; pushHist(); ED.els = ED.els.filter(x => x !== e); ED.sel = null; renderEditor(); renderSide(); };
+$("#eReset").onclick = () => { if (!confirm("슬라이드를 처음 템플릿으로 되돌릴까요?")) return; pushHist(); ED.els = templateElements(); ED.sel = null; renderEditor(); renderSide(); };
+document.addEventListener("keydown", ev => {
+  if (st.phase !== "prep" || st.view !== "zoom" || ED.editing || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  const e = selEl(), mod = ev.metaKey || ev.ctrlKey;
+  if (mod && ev.key.toLowerCase() === "z") { ev.preventDefault(); return undo(); }
+  if (!e) return;
+  if (mod && ev.key.toLowerCase() === "d") { ev.preventDefault(); return $("#eDup").click(); }
+  if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); return $("#eDel").click(); }
+  if (ev.key === "Enter" && e.type !== "line" && e.type !== "arrow") { ev.preventDefault(); return startEdit(e.id); }
+  if (ev.key === "Escape") { ED.sel = null; return renderEditor(); }
+  const step = ev.shiftKey ? 10 : 1, mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[ev.key];
+  if (mv) { ev.preventDefault(); pushHist(); e.x += mv[0]; e.y += mv[1]; renderEditor(); }
+});
+
+/* ================= 줌 화면 ================= */
+function participants(){
+  const list = S.interviewers.map(i => ({ id: i.id, ...who(i.id) }));
+  S.teams.forEach(t => list.push(t.id === st.team ? { id: "me", ...who("me"), me: true } : { id: t.id, ...who(t.id) }));
+  return list;
+}
+function makeTile(p){
+  const tile = el("div", "tile" + (st.speakerId === p.id ? " speaking" : ""));
+  if (p.me && st.cam) { const v = document.createElement("video"); v.autoplay = v.muted = v.playsInline = true; v.srcObject = st.cam; tile.append(v); }
+  else { const f = el("div", "face", initials(p.name)); f.style.background = p.color; tile.append(f); }
+  tile.append(el("div", "label", `${p.name} · ${p.team}`));
+  if (p.me) tile.append(el("div", "badge", "나"));
+  return tile;
+}
+function shareKind(){
+  if (st.phase === "brief") return "agenda";
+  if (st.phase === "meeting" && MT.team) return "npc";
+  if (["present", "rebuttal"].includes(st.phase)) return "player";
+  return null;
+}
+function renderZoom(){
+  const kind = shareKind(), g = $("#gallery"), fs = $("#filmstrip");
+  $("#share").classList.toggle("hidden", !kind); fs.classList.toggle("hidden", !kind); g.classList.toggle("hidden", !!kind);
+  (kind ? fs : g).innerHTML = "";
+  participants().forEach(p => (kind ? fs : g).append(makeTile(p)));
+  const holder = $("#shareHolder");
+  if (kind === "agenda") renderAgendaSlide(holder);
+  if (kind === "npc") renderNpcSlide(holder, teamById(MT.team), MT.step);
+  if (kind === "player") renderPlayerSlide(holder);
+}
+function renderStage(text){
+  const editing = st.phase === "prep" && st.view === "zoom";
+  $("#zoomView").classList.toggle("hidden", st.view !== "zoom" || editing);
+  $("#editorView").classList.toggle("hidden", !editing);
+  $("#metaView").classList.toggle("hidden", st.view !== "meta");
+  $("#stage").classList.toggle("meta-on", st.view === "meta");
+  $("#stage").classList.toggle("edit-on", editing);
+  if (editing) renderEditor();
+  else if (st.view === "zoom") renderZoom();
+  else renderRoom(text);
+}
+
+/* ================= 메타버스 회의실 ================= */
+const avatars = {};
+function buildRoom(){
+  const room = $("#room");
+  S.interviewers.forEach((iv, i) => { avatars[iv.id] = addAvatar(room, initials(iv.name), iv.name, iv.color, IV_SEATS[i]); });
+  S.teams.forEach(t => {
+    const seat = SEATS[t.seat];
+    avatars[t.id] = t.id === st.team ? addAvatar(room, "", "내 자리", t.color, seat, "seat-empty") : addAvatar(room, initials(t.npc.name), t.name, t.color, seat);
+  });
+  avatars.me = addAvatar(room, initials(st.name), `${st.name} (나)`, "#2d8cff", st.me, "me");
+  room.addEventListener("click", e => { const r = room.getBoundingClientRect(), k = r.width / 1000; walkTo((e.clientX - r.left) / k, (e.clientY - r.top) / k); });
+  fitRoom(); window.addEventListener("resize", fitRoom);
+}
+function addAvatar(room, txt, tag, color, pos, extra = ""){
+  const a = el("div", "avatar " + extra, txt); a.style.background = color; a.style.left = pos.x + "px"; a.style.top = pos.y + "px";
+  a.append(el("span", "tag", tag)); room.append(a); return a;
+}
+function fitRoom(){ const stage = $("#stage"); $("#room").style.transform = `scale(${Math.min((stage.clientWidth - 24) / 1020, (stage.clientHeight - 24) / 660, 1.2)})`; }
+function blocked(x, y){
+  const r = 26;
+  if (x < 30 || x > 970 || y < 70 || y > 610) return true;
+  return x > TABLE.x1 - r && x < TABLE.x2 + r && y > TABLE.y1 - r && y < TABLE.y2 + r;
+}
+function moveMe(dx, dy){
+  const nx = st.me.x + dx, ny = st.me.y + dy;
+  if (!blocked(nx, st.me.y)) st.me.x = nx;
+  if (!blocked(st.me.x, ny)) st.me.y = ny;
+  avatars.me.style.left = st.me.x + "px"; avatars.me.style.top = st.me.y + "px"; checkNear();
+}
+let walking = null;
+function walkTo(tx, ty){
+  clearInterval(walking);
+  walking = setInterval(() => {
+    const dx = tx - st.me.x, dy = ty - st.me.y, d = Math.hypot(dx, dy);
+    if (d < 6) return clearInterval(walking);
+    const bx = st.me.x, by = st.me.y; moveMe(dx / d * 6, dy / d * 6);
+    if (bx === st.me.x && by === st.me.y) clearInterval(walking);
+  }, 16);
+}
+const keys = new Set();
+document.addEventListener("keydown", e => {
+  if (st.view !== "meta" || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase(); if (["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"].includes(k)) { keys.add(k); e.preventDefault(); }
+});
+document.addEventListener("keyup", e => keys.delete(e.key.toLowerCase()));
+setInterval(() => {
+  if (!keys.size) return;
+  let dx = 0, dy = 0;
+  if (keys.has("w") || keys.has("arrowup")) dy -= 5; if (keys.has("s") || keys.has("arrowdown")) dy += 5;
+  if (keys.has("a") || keys.has("arrowleft")) dx -= 5; if (keys.has("d") || keys.has("arrowright")) dx += 5;
+  clearInterval(walking); moveMe(dx, dy);
+}, 16);
+function checkNear(){
+  const card = $("#nearCard");
+  const near = S.teams.filter(t => t.id !== st.team).map(t => ({ t, d: Math.hypot(SEATS[t.seat].x - st.me.x, SEATS[t.seat].y - st.me.y) })).sort((a, b) => a.d - b.d)[0];
+  if (!near || near.d > 95) return card.classList.add("hidden");
+  const t = near.t; st.visited.add(t.id); card.classList.remove("hidden"); card.innerHTML = "";
+  const h = el("h4"), dot = el("span"); dot.style.cssText = `width:10px;height:10px;border-radius:50%;background:${t.color}`;
+  h.append(dot, document.createTextNode(`${t.name} · ${t.npc.name}`));
+  card.append(h, el("div", "stance", "화두 · " + t.prompt));
+  if (st.presented.has(t.id)) card.append(el("div", "stance", "입장 · " + t.npc.stance), el("p", null, t.npc.talk.join(" ")));
+  else card.append(el("p", null, "아직 발표 전입니다. 부서별 발표 단계에서 주장을 들을 수 있습니다."));
+}
+function renderRoomScreen(){
+  const scr = $("#roomScreen"); scr.innerHTML = "";
+  const kind = st.phase === "prep" ? "player" : shareKind();
+  if (kind === "npc") { const t = teamById(MT.team); scr.append(el("b", null, t.npc.slide.title.replace(/\n/g, " ")), el("span", null, `${t.name} 발표 중 · ${MT.step + 1}/4`)); }
+  else if (kind === "player") scr.append(el("b", null, slideTitle() || "(제목 미정)"), el("span", null, `${myTeam().name} · ${st.name}`));
+  else scr.append(el("b", null, "오늘의 발제"), el("span", null, S.agenda.title.length > 34 ? S.agenda.title.slice(0, 34) + "…" : S.agenda.title));
+}
+function renderRoom(text){
+  Object.entries(avatars).forEach(([id, a]) => a.classList.toggle("speaking", id === st.speakerId));
+  $("#room").querySelectorAll(".bubble").forEach(b => b.remove());
+  if (st.speakerId && text && avatars[st.speakerId]) {
+    const a = avatars[st.speakerId], w = who(st.speakerId), b = el("div", "bubble");
+    b.append(el("b", null, `${w.name} · ${w.team}`), document.createTextNode(text.length > 110 ? text.slice(0, 110) + "…" : text));
+    b.style.left = a.style.left; b.style.top = a.style.top; $("#room").append(b);
+  }
+  renderRoomScreen(); checkNear();
+}
+
+/* ================= 사이드 패널 ================= */
+function renderTabs(){ document.querySelectorAll(".side-tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === st.tab)); }
+document.querySelectorAll(".side-tabs button").forEach(b => b.onclick = () => { st.tab = b.dataset.tab; renderTabs(); renderSide(); });
+function myPromptCard(){ const c = el("div", "card mine"); c.append(el("div", "k", `내 화두 · ${myTeam().name}`), el("div", null, myTeam().prompt)); return c; }
+function link(text, url){ const a = el("a", null, text); a.href = url; a.target = "_blank"; a.rel = "noopener"; return a; }
+function agendaPanel(body){
+  const c = el("div", "card");
+  c.append(el("div", "k", "발제"), el("h3", null, S.agenda.title), el("p", null, S.agenda.situation));
+  const q = el("p"); q.append(el("b", null, "질문 · "), document.createTextNode(S.agenda.question)); c.append(q);
+  body.append(c, myPromptCard());
+  const f = el("div", "card"); f.append(el("div", "k", "자료에서 확인된 사실"));
+  const ul = el("ul", "facts");
+  S.agenda.facts.forEach(x => { const li = el("li", null, x.text + " "), sup = el("sup"); sup.append(link(`[${x.source + 1}${x.ref ? " · " + x.ref : ""}]`, S.agenda.sources[x.source].url)); li.append(sup); ul.append(li); });
+  f.append(ul); body.append(f);
+  const s = el("div", "card"); s.append(el("div", "k", "출처"));
+  const ol = el("ol", "src"); S.agenda.sources.forEach(x => { const li = el("li"); li.append(link(x.title, x.url), document.createTextNode(` · ${x.outlet} · ${x.date}`)); ol.append(li); });
+  s.append(ol); body.append(s);
+}
+function logPanel(body){
+  if (!st.log.length) return body.append(el("div", "hint", "아직 발언이 없습니다."));
+  st.log.forEach(l => {
+    const it = el("div", "log-item"), w = el("div", "who", `${l.speaker} · ${l.team}`);
+    w.append(el("span", "when", new Date(l.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })));
+    it.append(w, el("div", null, l.text)); body.append(it);
+  });
+}
+function field(body, label, value, onInput, opts = {}){
+  const id = "f" + Math.random().toString(36).slice(2, 8), l = el("label", "f", label); l.htmlFor = id;
+  const inp = el(opts.area ? "textarea" : "input", "t"); inp.id = id; inp.value = value; if (opts.ph) inp.placeholder = opts.ph; if (opts.rows) inp.rows = opts.rows;
+  inp.oninput = () => onInput(inp.value);
+  body.append(l, inp); return inp;
+}
+function button(body, text, fn, primary = true){ const b = el("button", "btn block" + (primary ? " primary" : ""), text); b.onclick = fn; body.append(b); return b; }
+function teamList(){
+  const ul = el("ul", "tl");
+  S.teams.filter(t => t.id !== st.team).forEach(t => {
+    const now = MT.team === t.id, done = st.presented.has(t.id) && !now;
+    const li = el("li", now ? "now" : ""), dot = el("span", "dot"); dot.style.background = t.color;
+    li.append(dot, el("span", null, `${t.name} — ${t.npc.stance}`), el("span", "st", now ? `발표 중 ${MT.step + 1}/4` : done ? "완료" : "대기"));
+    ul.append(li);
+  });
+  return ul;
+}
+function renderSide(){
+  const body = $("#sideBody"); body.innerHTML = "";
+  if (st.tab === "agenda") return agendaPanel(body);
+  if (st.tab === "log") return logPanel(body);
+  const P = st.phase;
+  if (P === "brief") {
+    body.append(myPromptCard());
+    const c = el("div", "card"); c.append(el("div", "k", "진행 순서"));
+    const ol = el("ol", "facts");
+    ["화면의 발제와 '발제' 탭의 사실·출처를 확인합니다.", "다른 부서가 슬라이드를 넘기며 차례로 발표합니다.", "🏢 회의실 전체 보기로 자리를 돌며 각 팀 주장을 다시 볼 수 있습니다.", "내 차례에 1장 PPT를 직접 편집합니다 (도형·선·글꼴·크기).", "발표 후 반박과 질문에 답합니다."].forEach(s => ol.append(el("li", null, s)));
+    c.append(ol); body.append(c);
+    button(body, "부서별 발표 시작", () => setPhase("meeting"));
+  }
+  if (P === "meeting") {
+    if (MT.team) {
+      const t = teamById(MT.team), total = S.teams.length - 1, idx = total - MT.queue.length;
+      const c = el("div", "card"), h = el("h3", null, `${t.name} 발표 중`); h.style.color = t.color;
+      c.append(el("div", "k", `부서 ${idx}/${total} · 슬라이드 단계 ${MT.step + 1}/4`), h, el("div", null, t.npc.stance));
+      const pr = el("div", "prog"), pi = el("i"); pi.style.width = ((idx - 1) * 4 + MT.step + 1) / (total * 4) * 100 + "%"; pr.append(pi); c.append(pr);
+      const row = el("div", "btn-row");
+      const play = el("button", "btn", MT.auto ? "⏸ 일시정지" : "▶ 자동 진행"); play.onclick = () => { MT.auto = !MT.auto; if (MT.auto) advance(); else clearTimeout(MT.timer); renderSide(); };
+      const nx = el("button", "btn", "다음 장면 ⏭"); nx.onclick = () => { clearTimeout(MT.timer); advance(); };
+      const sk = el("button", "btn", "다음 부서 ⏩"); sk.onclick = () => { clearTimeout(MT.timer); nextTeam(); };
+      row.append(play, nx, sk); c.append(row); body.append(c);
+    }
+    body.append(myPromptCard(), teamList());
+    S.teams.filter(t => st.presented.has(t.id) && t.id !== MT.team).forEach(t => {
+      const d = el("details", "team-talk"); d.append(el("summary", null, `${t.name} 발표 다시 보기`), el("p", null, t.npc.talk.join(" "))); body.append(d);
+    });
+    if (!MT.team) button(body, "내 PPT 만들기", () => setPhase("prep"));
+  }
+  if (P === "prep") {
+    body.append(myPromptCard());
+    const left = ED.els.filter(e => !["free", "deco", "section"].includes(e.role) && !filled(e.text)).length;
+    const c = el("div", "card"); c.append(el("div", "k", "편집 방법"));
+    const ul = el("ul", "facts");
+    [["더블클릭", " 또는 ", "Enter", " — 글자 수정"], ["드래그", " — 이동, 모서리 핸들 — 크기 조절"], ["상단 도구", " — 도형·선·화살표 추가, 글꼴·크기·색·선 두께"], ["⌘Z", " 실행 취소 · ", "⌘D", " 복제 · ", "Delete", " 삭제 · 방향키 미세 이동"]].forEach(parts => {
+      const li = el("li"); parts.forEach((p, i) => li.append(i % 2 === 0 ? el("kbd", null, p) : document.createTextNode(p))); ul.append(li);
+    });
+    c.append(ul, el("div", "hint", left ? `[ ]로 표시된 칸이 ${left}개 남았습니다.` : "모든 칸을 채웠습니다.")); body.append(c);
+    const o = el("div", "card"); o.append(el("div", "k", "다른 부서 입장 (조율 포인트)"));
+    const ol = el("ul", "facts"); S.teams.filter(t => t.id !== st.team).forEach(t => ol.append(el("li", null, `${t.name}: ${t.npc.stance}`))); o.append(ol); body.append(o);
+    button(body, "발표 시작", () => { commitEdit(); ED.sel = null; setPhase("present"); });
+  }
+  if (P === "present") {
+    const c = el("div", "card mine"); c.append(el("div", "k", "발표 중"), el("div", null, `제한 ${Math.round(S.agenda.speakSeconds / 60)}분. 마이크를 켜면 말한 내용이 받아 적힙니다. 직접 써도 됩니다.`)); body.append(c);
+    const ta = field(body, "발표 스크립트", st.script, v => { st.script = v; }, { area: true, rows: 12, ph: "결론 → 근거 → 실행 → 리스크 순서로 말해보세요." });
+    ta.id = "scriptBox";
+    button(body, "발표 종료", () => { st.presentSeconds = elapsed("present"); stopMic(); say("me", st.script || "(스크립트 없음)", "presentation"); setTimeout(() => setPhase("rebuttal"), 600); });
+  }
+  if (P === "rebuttal") {
+    const r = st.rebuttal, w = who(r.from), c = el("div", "card pressure");
+    c.append(el("div", "k", `${w.team} ${w.name}의 반박`), el("div", null, r.prompt), el("div", "hint", "상대 의견에서 인정할 부분은 인정하고, 우리 안을 유지할 근거와 절충안을 제시하세요. 제한 60초."));
+    body.append(c);
+    field(body, "내 답변", r.answer, v => r.answer = v, { area: true, rows: 7 });
+    button(body, "답변 제출", () => { r.seconds = elapsed("rebuttal"); say("me", r.answer || "(답변 없음)", "rebuttal-answer"); setTimeout(() => setPhase("qa"), 600); });
+  }
+  if (P === "qa") {
+    const q = st.qa[st.qaIndex]; if (!q) return;
+    const w = who(q.by), c = el("div", "card");
+    c.append(el("div", "k", `질문 ${st.qaIndex + 1}/${st.qa.length} · ${w.name} (${w.team})`), el("div", null, q.q)); body.append(c);
+    field(body, "내 답변", q.answer, v => q.answer = v, { area: true, rows: 7 });
+    button(body, st.qaIndex + 1 < st.qa.length ? "답변 제출 · 다음 질문" : "답변 제출 · 면접 종료", () => {
+      q.seconds = Math.round((Date.now() - q.askedAt) / 1000); say("me", q.answer || "(답변 없음)", "answer");
+      st.qaIndex++; setTimeout(askQ, 600);
+    });
+  }
+  if (P === "result") resultPanel(body);
+}
+
+/* ================= 결과 (규칙 기반 임시 채점) ================= */
+function selfScore(){
+  const t = myTeam();
+  const texts = ED.els.map(e => e.text || "").filter(filled), slideText = texts.join(" ");
+  const all = [slideText, st.script, st.rebuttal?.answer || "", ...st.qa.map(q => q.answer)].join(" ");
+  const others = S.teams.filter(x => x.id !== st.team);
+  const kw = t.keywords.filter(k => all.includes(k)).length;
+  const facts = (S.factTokens || []).filter(k => all.includes(k)).length + Math.min(3, (all.match(/\d+(\.\d+)?\s*(%|만|억|조|대|개월|년)/g) || []).length);
+  const mentioned = others.filter(o => all.includes(o.name.replace("팀", ""))).length;
+  const riskText = elText("risk").filter(filled).join(" ") + " " + texts.filter(s => /리스크|위험/.test(s)).join(" ");
+  const riskOk = riskText.trim().length >= 10, riskAlt = /대응|대안|완화|보완|절충|단계|→/.test(riskText + st.script);
+  const titleOk = elText("title").some(filled);
+  const pointsFilled = Math.min(3, elText("point").filter(filled).length + ED.els.filter(e => e.role === "free" && e.type === "text" && filled(e.text)).length);
+  const askOk = elText("ask").some(filled), scriptLen = st.script.trim().length;
+  const timeOk = st.presentSeconds > 0 && st.presentSeconds <= S.agenda.speakSeconds + 15;
+  const clamp = v => Math.max(1, Math.min(5, v));
+  return {
+    fit: { score: clamp(1 + kw), tip: kw >= 3 ? "화두 핵심어를 충분히 다뤘습니다." : `화두 핵심어(${t.keywords.slice(0, 4).join(", ")} 등)를 더 직접적으로 다루세요.` },
+    evidence: { score: clamp(1 + Math.floor(facts / 2)), tip: facts >= 4 ? "발제 사실과 수치를 근거로 잘 썼습니다." : "'발제' 탭의 수치를 슬라이드와 발표에 인용하세요." },
+    collab: { score: clamp(1 + mentioned + (askOk ? 1 : 0) + ((st.rebuttal?.answer || "").length > 40 ? 1 : 0)), tip: mentioned >= 2 ? "다른 부서 입장을 언급하며 조율했습니다." : "반박한 부서를 포함해 2개 이상 부서의 입장을 언급하고 절충안을 내세요." },
+    risk: { score: clamp((riskOk ? 3 : 1) + (riskAlt ? 2 : 0)), tip: riskOk && riskAlt ? "리스크와 대응을 함께 제시했습니다." : "리스크 한 가지와 그 대응책을 짝지어 쓰세요." },
+    structure: { score: clamp((titleOk ? 1 : 0) + pointsFilled + (scriptLen >= 250 ? 1 : 0) - (timeOk ? 0 : 1)), tip: !timeOk ? "제한 시간을 지키지 못했습니다." : !titleOk ? "슬라이드 제목에 결론을 쓰세요." : pointsFilled < 3 ? "실행 방안 3개를 모두 채우세요." : "결론-근거-실행 구조가 갖춰졌습니다." },
+  };
+}
+function resultPanel(body){
+  const sc = selfScore(), total = Object.values(sc).reduce((a, b) => a + b.score, 0);
+  const c = el("div", "card mine"); c.append(el("div", "k", "자가 점검 (규칙 기반 임시 채점)"), el("div", "total", `${total} / 25`),
+    el("div", "hint", "키워드·수치·구조를 기준으로 한 자동 점검입니다. AI 평가와 면접관 피드백은 백엔드 연결 후 제공됩니다."));
+  body.append(c);
+  (S.rubric || DEFAULT_RUBRIC).forEach(r => {
+    const row = el("div", "score-row"), top = el("div", "row"); top.append(el("b", null, r.label), el("span", "hint", `${sc[r.id].score}/5`));
+    const bar = el("div", "bar"), i = el("i"); i.style.width = sc[r.id].score * 20 + "%"; bar.append(i);
+    row.append(top, bar, el("div", "tip", sc[r.id].tip)); body.append(row);
+  });
+  button(body, "결과 JSON 내보내기 (백엔드 전송 형식)", () => download(sessionPayload(sc)), false);
+  button(body, "다른 발제·직무로 다시 하기", () => location.reload());
+}
+function sessionPayload(score){
+  return {
+    scenarioId: S.id, companyId: S.company.id, team: st.team, applicant: { displayName: st.name },
+    startedAt: st.startedAt, endedAt: new Date().toISOString(),
+    slide: { elements: ED.els, text: ED.els.map(e => e.text).filter(filled) },
+    script: { text: st.script, source: st.scriptSource, seconds: st.presentSeconds },
+    rebuttal: st.rebuttal, qa: st.qa.map(({ by, q, answer, seconds }) => ({ by, question: q, answer, seconds })),
+    visitedSeats: [...st.visited], selfScore: Object.fromEntries(Object.entries(score).map(([k, v]) => [k, v.score])),
+    transcript: st.log,
+  };
+}
+function download(obj){
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const a = el("a"); a.href = URL.createObjectURL(blob); a.download = `pt-session-${S.id}-${Date.now()}.json`; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ================= 하단 컨트롤 ================= */
+$("#viewBtn").onclick = () => {
+  if (!st.phase) return;
+  commitEdit();
+  st.view = st.view === "zoom" ? "meta" : "zoom";
+  $("#viewBtn .tx").textContent = st.view === "meta" ? (st.phase === "prep" ? "PPT 편집으로" : "줌 화면으로") : "회의실 전체 보기";
+  $("#viewBtn .ic").textContent = st.view === "meta" ? "🎥" : "🏢";
+  if (st.view === "meta") fitRoom();
+  renderStage(st.log.at(-1)?.text);
+};
+$("#ttsBtn").onclick = () => { st.tts = !st.tts; $("#ttsBtn").classList.toggle("off", !st.tts); if (!st.tts && "speechSynthesis" in window) speechSynthesis.cancel(); };
+$("#camBtn").onclick = async () => {
+  if (st.cam) { st.cam.getTracks().forEach(t => t.stop()); st.cam = null; }
+  else { try { st.cam = await navigator.mediaDevices.getUserMedia({ video: true }); } catch { alert("카메라를 사용할 수 없습니다. 브라우저 권한을 확인하세요."); } }
+  $("#camBtn").classList.toggle("off", !st.cam); if (st.phase) renderStage();
+};
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function stopMic(){ if (st.mic) { st.mic.onend = null; st.mic.stop(); st.mic = null; } $("#micBtn").classList.add("off"); }
+$("#micBtn").onclick = () => {
+  if (st.mic) return stopMic();
+  if (!SR) return alert("이 브라우저는 음성 받아쓰기를 지원하지 않습니다. Chrome에서 열거나 직접 입력하세요.");
+  if (st.phase !== "present") return alert("마이크 받아쓰기는 발표 단계에서 사용합니다.");
+  const r = new SR(); r.lang = "ko-KR"; r.continuous = true; r.interimResults = false;
+  r.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) st.script += (st.script ? " " : "") + e.results[i][0].transcript.trim();
+    st.scriptSource = "speech"; const box = $("#scriptBox"); if (box) box.value = st.script;
+  };
+  r.onend = () => { if (st.mic) r.start(); };
+  r.start(); st.mic = r; $("#micBtn").classList.remove("off");
+};
+$("#leaveBtn").onclick = () => { if (confirm("면접을 종료하고 나갈까요?")) location.href = "index.html"; };
+
+/* ================= 시작 ================= */
+const want = new URLSearchParams(location.search).get("s");
+S = ALL.find(s => s.id === want) || ALL[0];
+renderJoin();
+})();
+</script>
+</body>
+</html>

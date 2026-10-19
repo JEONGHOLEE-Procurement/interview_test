@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>첫직장은무조건대기업</title>
+<meta name="description" content="서류 합격 후 면접을 앞둔 취준생을 위한 PT 면접 시뮬레이터. 최신 뉴스로 발제하고, 직무별 화두로 회의실에서 발표합니다.">
+<script src="data/scenario-hyundai-india.js"></script>
+<script src="data/scenario-kia-cost.js"></script>
+<script src="data/scenario-kia-us.js"></script>
+<script src="data/scenario-kia-pbv.js"></script>
+<style>
+:root{--bg:#0b0d11;--panel:#151922;--line:#262c38;--text:#eef0f4;--muted:#9aa1ad;--accent:#2d8cff;--accent-2:#3ccf7a;--radius:16px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif}
+a{color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+.logo{font-weight:800;letter-spacing:-.02em}
+.logo span{color:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:12px;font-weight:700;text-decoration:none;border:1px solid var(--line);background:var(--panel)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.sm{padding:8px 14px;font-size:14px}
+.hero{padding:56px 0 40px;display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center}
+.eyebrow{display:inline-block;font-size:13px;color:var(--accent-2);background:rgba(60,207,122,.1);padding:4px 10px;border-radius:999px;margin-bottom:14px}
+h1{font-size:clamp(30px,4.6vw,48px);line-height:1.2;margin:0 0 16px;letter-spacing:-.03em}
+h1 em{font-style:normal;color:var(--accent)}
+.lead{color:#c7ccd6;font-size:18px;margin:0 0 24px}
+.cta{display:flex;gap:10px;flex-wrap:wrap}
+.note{font-size:13px;color:var(--muted);margin-top:12px}
+
+/* 미리보기 (줌 + 회의실) */
+.preview{position:relative;aspect-ratio:4/3;background:#12151b;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.pv-bar{height:30px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid var(--line);font-size:11px;color:#ef5350;font-weight:700}
+.pv-room{position:absolute;inset:30px 0 0;background:repeating-linear-gradient(0deg,transparent 0 23px,rgba(255,255,255,.04) 23px 24px),repeating-linear-gradient(90deg,transparent 0 23px,rgba(255,255,255,.04) 23px 24px),#232833}
+.pv-table{position:absolute;left:22%;top:34%;width:56%;height:32%;border-radius:999px;background:linear-gradient(180deg,#6a5340,#5b4636)}
+.pv-a{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:2px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.pv-a.talk::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid var(--accent-2);animation:p 1.3s infinite}
+@keyframes p{from{transform:scale(.9);opacity:1}to{transform:scale(1.3);opacity:0}}
+.pv-bubble{position:absolute;left:50%;top:8%;transform:translateX(-50%);background:#fff;color:#111;font-size:12px;padding:8px 12px;border-radius:10px;width:min(78%,320px);line-height:1.45}
+.pv-zoom{position:absolute;right:10px;bottom:10px;width:38%;aspect-ratio:16/10;background:#0b0d11;border:2px solid var(--accent-2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted)}
+
+section{padding:56px 0;border-top:1px solid var(--line)}
+h2{font-size:clamp(24px,3vw,32px);margin:0 0 8px;letter-spacing:-.02em}
+.sub{color:var(--muted);margin:0 0 28px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;counter-reset:s}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.step::before{counter-increment:s;content:counter(s);display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;align-items:center;justify-content:center;font-size:14px;margin-bottom:10px}
+.step h3{margin:0 0 6px;font-size:17px}
+.step p{margin:0;color:#c7ccd6;font-size:14px}
+
+.agenda{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px}
+.agenda .tag{font-size:12px;color:var(--muted)}
+.agenda h3{margin:6px 0 10px;font-size:20px}
+.agenda ul{margin:12px 0 0;padding-left:18px;color:#c7ccd6;font-size:14px}
+.agenda .src{margin-top:12px;font-size:12px;color:var(--muted)}
+.agenda .src a{color:#7fb6ff}
+.teams{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.team{background:#0f1218;border:1px solid var(--line);border-radius:12px;padding:14px}
+.team b{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.team b i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.team p{margin:0;font-size:13px;color:#c7ccd6}
+.team.off{opacity:.45;border-style:dashed}
+
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.box h3{margin:0 0 10px}
+.box ul{margin:0;padding-left:18px;color:#c7ccd6}
+.box.good{border-color:rgba(45,140,255,.5)}
+
+.sc-list{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sc{display:block;text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.sc:hover{border-color:var(--accent)}
+.sc small{display:block;font-size:12px;color:#7fb6ff;font-weight:700}
+.sc b{display:block;margin:4px 0 6px}
+.sc span{font-size:13px;color:var(--muted)}
+.final{text-align:center}
+footer{padding:28px 0 40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+
+@media (max-width:860px){
+  .sc-list{grid-template-columns:1fr 1fr}
+  .hero{grid-template-columns:1fr;padding-top:24px}
+  .steps{grid-template-columns:1fr 1fr}
+  .teams{grid-template-columns:1fr}
+  .compare{grid-template-columns:1fr}
+}
+@media (max-width:480px){ .steps{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="logo">첫직장은<span>무조건</span>대기업</div>
+    <a class="btn sm primary" href="app.html">체험하기</a>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <span class="eyebrow">서류 합격, 축하합니다. 이제 면접입니다.</span>
+      <h1>PT 면접은 혼자 연습하면<br><em>회의가 안 됩니다</em></h1>
+      <p class="lead">실제 PT 면접은 '내 직무 관점에서, 다른 부서 의견까지 고려해' 말하는 자리입니다. 최신 뉴스로 발제하고, 직무별 화두를 받고, 다른 부서 대표들과 한 회의실에서 발표해 보세요.</p>
+      <div class="cta">
+        <a class="btn primary" href="app.html">현대자동차 PT 면접 체험하기 →</a>
+        <a class="btn" href="#how">어떻게 진행되나요</a>
+      </div>
+      <p class="note">프로토타입 · 회원가입 없이 바로 체험 · 입력한 내용은 이 브라우저 밖으로 전송되지 않습니다</p>
+    </div>
+    <div class="preview" aria-hidden="true">
+      <div class="pv-bar">● REC &nbsp;<span style="color:var(--muted);font-weight:400">PT 면접 · 인도 생산능력 확대</span></div>
+      <div class="pv-room">
+        <div class="pv-table"></div>
+        <div class="pv-bubble"><b style="font-size:11px;color:#666">해외영업팀</b><br>원가팀 게이트 방식은 너무 보수적입니다. 2단계를 앞당겨야 합니다.</div>
+        <div class="pv-a" style="left:44%;top:26%;background:#5b6b7f">A</div>
+        <div class="pv-a" style="left:56%;top:26%;background:#6f5b7f">B</div>
+        <div class="pv-a" style="left:32%;top:30%;background:#e0794a">원</div>
+        <div class="pv-a" style="left:68%;top:30%;background:#3f8fd2">구</div>
+        <div class="pv-a" style="left:32%;top:72%;background:#c9a227">품</div>
+        <div class="pv-a talk" style="left:50%;top:74%;background:#8a63d2">해</div>
+        <div class="pv-a" style="left:68%;top:72%;background:#d0587e">재</div>
+        <div class="pv-a" style="left:16%;top:52%;background:#2d8cff;border-color:#2d8cff">나</div>
+        <div class="pv-zoom">줌 화면 ⇄ 회의실 전체 보기</div>
+      </div>
+    </div>
+  </header>
+</div>
+
+<section id="how">
+  <div class="wrap">
+    <h2>면접장처럼, 그런데 회의실 전체가 보이게</h2>
+    <p class="sub">겉은 줌 면접, 안쪽은 모든 부서가 앉아 있는 회의실입니다. 버튼 하나로 오갈 수 있습니다.</p>
+    <div class="steps">
+      <div class="step"><h3>뉴스로 발제</h3><p>지원 기업의 최근 기사와 공식 발표에서 주제를 뽑습니다. 사실마다 출처가 붙습니다.</p></div>
+      <div class="step"><h3>직무별 화두</h3><p>같은 주제라도 원가팀은 투자비, 구매팀은 협력사 발굴을 맡습니다. 관련 없는 직무는 빠집니다.</p></div>
+      <div class="step"><h3>회의실에서 발표</h3><p>다른 부서 대표들이 먼저 주장합니다. 자리를 돌아다니며 다시 듣고, 1장 PPT를 만들어 발표합니다.</p></div>
+      <div class="step"><h3>반박과 질의응답</h3><p>내 안에 반대하는 부서가 반박하고, 면접관이 꼬리 질문을 던집니다. 끝나면 5개 항목 점검표를 받습니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>지금 연습할 수 있는 발제</h2>
+    <p class="sub">콘텐츠팀이 뉴스와 기업 발표 자료를 확인해 만든 주제입니다. 사실마다 출처가 붙습니다.</p>
+    <div class="sc-list" id="scList"></div>
+    <div class="agenda" id="agenda" style="margin-top:16px"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>혼자 하는 연습과 무엇이 다른가요</h2>
+    <p class="sub">PT 면접에서 자주 놓치는 것은 내용보다 '다른 부서와의 관계'입니다.</p>
+    <div class="compare">
+      <div class="box"><h3>혼자 준비할 때</h3><ul><li>주제를 직접 찾아야 하고, 오래된 기사로 준비하기 쉽습니다</li><li>내 직무 이야기만 하다 끝납니다</li><li>"다른 부서는 반대할 텐데요?"라는 질문에 처음 답하게 됩니다</li></ul></div>
+      <div class="box good"><h3>회의실에서 연습하면</h3><ul><li>최신 발제와 출처가 준비되어 있습니다</li><li>다른 부서의 주장을 먼저 듣고 내 안을 조율합니다</li><li>반박과 꼬리 질문을 미리 겪어봅니다</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <h2>면접 전에 한 번, 회의실에 앉아 보세요</h2>
+    <p class="sub">현대자동차·기아 PT 면접 발제 4개를 체험할 수 있습니다. 다른 기업은 순차적으로 준비 중입니다.</p>
+    <a class="btn primary" href="app.html">지금 체험하기 →</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    첫직장은무조건대기업 · 프로토타입<br>
+    본 서비스는 각 기업과 제휴하거나 공식 승인을 받지 않은 독립 면접 연습 서비스입니다. 발제는 공개된 뉴스를 바탕으로 재구성했으며, 실제 면접 문항과 다를 수 있습니다.
+  </div>
+</footer>
+
+<script>
+(() => {
+  const ALL = window.SCENARIOS || [], S = ALL[0];
+  const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+  const list = document.getElementById("scList");
+  ALL.forEach(sc => { const a = el("a", "sc"); a.href = "app.html?s=" + encodeURIComponent(sc.id); a.append(el("small", null, sc.company.name), el("b", null, sc.shortTitle), el("span", null, `${sc.teams.length}개 부서 · ${sc.agenda.sources[0].outlet} ${sc.agenda.sources[0].date}`)); list.append(a); });
+  const box = document.getElementById("agenda");
+  box.append(el("div", "tag", `예시 · ${S.company.name} · ${S.company.interviewType}`), el("h3", null, S.agenda.title), el("p", null, S.agenda.question));
+  const ul = el("ul"); S.agenda.facts.slice(0, 4).forEach(f => ul.append(el("li", null, f.text))); box.append(ul);
+  const teams = el("div", "teams");
+  S.teams.forEach(t => { const d = el("div", "team"), b = el("b"), i = el("i"); i.style.background = t.color; b.append(i, document.createTextNode(t.name)); d.append(b, el("p", null, t.prompt)); teams.append(d); });
+  S.excludedTeams.forEach(t => { const d = el("div", "team off"); d.append(el("b", null, t.name + " · 제외"), el("p", null, t.reason)); teams.append(d); });
+  box.append(teams);
+  const src = el("div", "src", "출처: ");
+  S.agenda.sources.forEach((s, i) => { const a = el("a", null, `${s.outlet}(${s.date})`); a.href = s.url; a.target = "_blank"; a.rel = "noopener"; src.append(a); if (i < S.agenda.sources.length - 1) src.append(" · "); });
+  box.append(src);
+})();
+</script>
+</body>
+</html>
