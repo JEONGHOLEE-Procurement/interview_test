@@ -101,3 +101,11 @@ waitlist        id, email, company_interest, job_team, interview_date, consent, 
 ## 9. 2단계: 실시간 다인원 회의실
 
 여러 지원자가 같은 회의실에 들어가는 스터디 모드. WebSocket 이벤트: `room.join`, `avatar.move {x,y}`, `speaker.start/stop`, `slide.update`, `chat.message`. 1단계(현재)는 1인 + NPC로 검증한다.
+
+## 10. 1단계 구현: Notion 백엔드 (2026-10-19)
+- 저장소: Notion "첫무대 백엔드" 페이지 아래 DB 3개 — `면접 세션`, `발제`, `대기자`
+- 중계 서버: `backend/notion-proxy/worker.js` (Cloudflare Worker). 브라우저 → 중계 서버 → Notion API
+- 저장 조건: 결과 화면에서 지원자가 동의 체크 → `POST /api/sessions`. 동의 없으면 전송하지 않음
+- 서버 없이 쓰는 방법: 내보낸 JSON을 `backend/notion-proxy/import-json.mjs`로 업로드
+- 다른 Notion DB에 연결할 때: `setup.mjs`가 빠진 열만 추가 (기존 데이터 유지)
+- 열 목록과 사용법: `backend/notion-proxy/README.md`
