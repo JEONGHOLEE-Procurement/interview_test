@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PT면접시뮬레이터 · 스터디 방</title>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="data/scenario-hyundai-india.js"></script>
+<script src="data/scenario-hmc-cost.js"></script>
+<script src="data/scenario-hmc-na.js"></script>
+<script src="data/scenario-hmc-robotics.js"></script>
+<script src="data/scenario-hmc-india-sourcing.js"></script>
+<script src="data/scenario-hmc-battery-sourcing.js"></script>
+<script src="data/scenario-kia-esg-supply.js"></script>
+<script src="data/scenario-hmc-atlas-supply.js"></script>
+<script src="data/scenario-kia-cost.js"></script>
+<script src="data/scenario-kia-us.js"></script>
+<script src="data/scenario-kia-pbv.js"></script>
+<style>
+:root{--bg:#0b0d11;--panel:#151922;--panel-2:#1f232c;--line:#262c38;--text:#eef0f4;--muted:#9aa1ad;--accent:#2d8cff;--warn:#f5b041;--danger:#ef5350}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:radial-gradient(ellipse at top,#1a2333,var(--bg) 70%);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif}
+.wrap{max-width:560px;margin:0 auto;padding:40px 16px}
+h1{margin:0 0 4px;font-size:24px}
+.sub{color:var(--muted);margin:0 0 24px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:17px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--muted);font:inherit;cursor:pointer}
+.tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,select{width:100%;background:#0f1218;border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px 12px;font:inherit}
+input:focus,select:focus{outline:2px solid var(--accent);border-color:transparent}
+.btn{display:inline-flex;align-items:center;justify-content:center;width:100%;margin-top:14px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{font-size:13px;margin-top:10px;min-height:20px}
+.msg.err{color:var(--danger)} .msg.ok{color:#3ccf7a} .msg.warn{color:var(--warn)}
+.who{display:flex;justify-content:space-between;align-items:center}
+.who button{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font:inherit}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+.hidden{display:none!important}
+a{color:#7fb6ff}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>면접 스터디 방</h1>
+  <p class="sub">최대 4명이 각자 계정으로 들어와 같은 회의실에서 PT 면접을 함께 진행합니다. <a href="./">혼자 연습하기</a></p>
+
+  <!-- 로그인 / 회원가입 -->
+  <section class="card" id="authCard">
+    <div class="tabs"><button data-mode="login" class="on">로그인</button><button data-mode="signup">회원가입</button></div>
+    <form id="authForm">
+      <div id="nameRow" class="hidden"><label for="name">이름 (스터디에서 보일 이름)</label><input id="name" maxlength="20" autocomplete="nickname"></div>
+      <label for="email">이메일</label><input id="email" type="email" required autocomplete="email">
+      <label for="pw">비밀번호</label><input id="pw" type="password" required minlength="8" autocomplete="current-password">
+      <div id="agreeRow" class="hidden hint"><label style="display:flex;gap:8px;align-items:flex-start;color:var(--muted)"><input type="checkbox" id="agree" style="width:auto;margin-top:4px">이메일·이름과 스터디 중 작성한 발표·채팅을 서비스 운영을 위해 저장하는 데 동의합니다. 비밀번호는 인증 서비스(Supabase)가 암호화해 보관하며 운영자도 볼 수 없습니다.</label></div>
+      <button class="btn primary" id="authBtn">로그인</button>
+    </form>
+    <div class="msg" id="authMsg"></div>
+  </section>
+
+  <!-- 로비 -->
+  <section class="hidden" id="lobby">
+    <div class="card who"><div><b id="meName"></b>님 <span class="hint" id="meEmail"></span></div><button id="logout">로그아웃</button></div>
+    <div class="card">
+      <h2>새 스터디 방 만들기</h2>
+      <label for="scenario">발제</label><select id="scenario"></select>
+      <button class="btn primary" id="createBtn">방 만들기</button>
+      <div class="hint">방을 만든 사람이 방장이 되어 진행 단계를 넘깁니다. 만든 뒤 방 코드나 링크를 스터디원에게 보내세요.</div>
+    </div>
+    <div class="card">
+      <h2>방 코드로 들어가기</h2>
+      <label for="code">방 코드</label><input id="code" placeholder="예: K7P2Q-03" maxlength="8" style="text-transform:uppercase">
+      <button class="btn" id="joinBtn">입장</button>
+      <div class="msg" id="joinMsg"></div>
+    </div>
+  </section>
+</div>
+<script>
+(() => {
+  const CFG = window.APP_CONFIG || {}, $ = s => document.querySelector(s);
+  const ALL = (window.SCENARIOS || []).slice().sort((a, b) => a.id.localeCompare(b.id)); // 방 코드 뒤 두 자리 = 이 목록의 순번
+  if (!window.supabase || !CFG.supabaseUrl) { $("#authMsg").textContent = "실시간 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요."; $("#authMsg").className = "msg err"; return; }
+  const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey);
+  const next = new URLSearchParams(location.search).get("next");
+  let mode = "login";
+
+  document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+    $("#nameRow").classList.toggle("hidden", mode !== "signup"); $("#agreeRow").classList.toggle("hidden", mode !== "signup");
+    $("#authBtn").textContent = mode === "signup" ? "회원가입" : "로그인";
+    $("#pw").autocomplete = mode === "signup" ? "new-password" : "current-password";
+    msg("", "");
+  });
+  const msg = (t, c) => { $("#authMsg").textContent = t; $("#authMsg").className = "msg " + c; };
+  const KR = { "Invalid login credentials": "이메일 또는 비밀번호가 맞지 않습니다.", "Email not confirmed": "이메일 인증을 먼저 완료하세요. 받은편지함을 확인하세요.", "User already registered": "이미 가입된 이메일입니다. 로그인하세요." };
+
+  $("#authForm").onsubmit = async e => {
+    e.preventDefault();
+    const email = $("#email").value.trim(), password = $("#pw").value;
+    $("#authBtn").disabled = true; msg("처리 중…", "");
+    try {
+      if (mode === "signup") {
+        const name = $("#name").value.trim();
+        if (!name) throw new Error("이름을 입력하세요.");
+        if (!$("#agree").checked) throw new Error("저장 동의에 체크해야 가입할 수 있습니다.");
+        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: location.href.split("#")[0] } });
+        if (error) throw error;
+        if (!data.session) { msg("가입 확인 메일을 보냈습니다. 메일의 링크를 누른 뒤 로그인하세요.", "ok"); return; }
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+      await show();
+    } catch (err) { msg(KR[err.message] || err.message, "err"); }
+    finally { $("#authBtn").disabled = false; }
+  };
+  $("#logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+  const sel = $("#scenario");
+  ["현대자동차", "기아"].forEach(co => {
+    const g = document.createElement("optgroup"); g.label = co;
+    ALL.forEach((sc, i) => { if (sc.company.name === co) { const o = document.createElement("option"); o.value = i; o.textContent = (sc.focus ? `[${sc.focus} 특화] ` : "") + sc.shortTitle; g.append(o); } });
+    sel.append(g);
+  });
+  const roomUrl = (code, sc) => `app.html?room=${code}&s=${encodeURIComponent(sc.id)}`;
+  $("#createBtn").onclick = () => {
+    const i = +sel.value, abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", rnd = crypto.getRandomValues(new Uint8Array(5));
+    const code = [...rnd].map(b => abc[b % abc.length]).join("") + "-" + String(i).padStart(2, "0");
+    location.href = roomUrl(code, ALL[i]);
+  };
+  $("#joinBtn").onclick = () => {
+    const code = $("#code").value.trim().toUpperCase(), m = code.match(/^[A-Z0-9]{5}-(\d{2})$/);
+    if (!m || !ALL[+m[1]]) { $("#joinMsg").textContent = "방 코드 형식이 맞지 않습니다. 예: K7P2Q-03"; $("#joinMsg").className = "msg err"; return; }
+    location.href = roomUrl(code, ALL[+m[1]]);
+  };
+
+  async function show(){
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    if (next && next.startsWith(location.origin)) { location.href = next; return; }
+    $("#authCard").classList.add("hidden"); $("#lobby").classList.remove("hidden");
+    $("#meName").textContent = session.user.user_metadata?.name || session.user.email.split("@")[0];
+    $("#meEmail").textContent = session.user.email;
+  }
+  show();
+})();
+</script>
+</body>
+</html>
