@@ -13,6 +13,7 @@
 <script src="data/scenario-hmc-battery-sourcing.js"></script>
 <script src="data/scenario-kia-esg-supply.js"></script>
 <script src="data/scenario-hmc-atlas-supply.js"></script>
+<script src="data/hmc-extra-roles.js"></script>
 <script src="data/scenario-kia-cost.js"></script>
 <script src="data/scenario-kia-us.js"></script>
 <script src="data/scenario-kia-pbv.js"></script>
@@ -257,9 +258,13 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
 .team-card .nm{display:flex;align-items:center;gap:8px;font-weight:700}
 .team-card .dot{width:12px;height:12px;border-radius:50%}
 .team-card .pr{font-size:13px;color:#cfd4dd}
+.team-card .xb{font-size:10px;font-weight:700;color:#04060a;background:#b08d57;border-radius:4px;padding:0 6px;margin-left:auto}
 .team-card.excluded{opacity:.45;cursor:not-allowed;border-style:dashed}
 .join-foot{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
 .join-foot .grow{flex:1;min-width:200px}
+.rep-deck{height:min(56vw,540px);margin:12px 0 16px}
+.pre{white-space:pre-wrap;margin:6px 0 0}
+#report .btn{text-decoration:none}
 .join-need{font-size:12px;color:var(--warn);margin-top:6px;min-height:18px}
 
 @media (max-width:900px){
@@ -306,6 +311,8 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
     <div class="join-need" id="joinNeed"></div>
   </div>
 </section>
+
+<section class="join hidden" id="report"></section>
 
 <header class="topbar">
   <span class="rec">REC</span>
@@ -440,7 +447,7 @@ const st = {
 const MT = { queue: [], team: null, step: 0, auto: true, timer: null };   // 부서별 발표 진행
 const ED = { els: [], sel: null, hist: [], editing: null, lastDown: null }; // 내 PPT 편집기
 
-const SEATS = [ {x:380,y:198},{x:500,y:198},{x:620,y:198},{x:380,y:442},{x:500,y:442},{x:620,y:442} ];
+const SEATS = [ {x:380,y:198},{x:500,y:198},{x:620,y:198},{x:380,y:442},{x:500,y:442},{x:620,y:442},{x:250,y:320} ];
 const IV_SEATS = [ {x:450,y:80},{x:550,y:80} ];
 const TABLE = { x1:300, y1:230, x2:700, y2:410 };
 const teamById = id => S.teams.find(t => t.id === id);
@@ -448,17 +455,27 @@ const myTeam = () => teamById(st.team);
 const initials = s => s.replace(/(책임|매니저|상무|실장|면접관)/g, "").trim().slice(0, 1) || "?";
 const footnote = () => `※ 출처: ${S.agenda.sources.map(s => `${s.outlet} ${s.title.length > 26 ? s.title.slice(0, 26) + "…" : s.title}`).join(" / ")} · '(가정)'은 팀 가정치`;
 
+/* ================= 추가 직무(현대차 전용) 병합 ================= */
+function withTeam(sc, teamId){
+  const x = (sc.extraTeams || []).find(t => t.id === teamId);
+  if (!x || sc.teams.some(t => t.id === teamId)) return sc;
+  return { ...sc,
+    teams: [...sc.teams, { ...x, seat: 6, npc: { name: "", stance: "", talk: [], slide: { points: [] } } }],
+    conflicts: { ...sc.conflicts, [x.id]: x.conflict },
+    followUps: { ...sc.followUps, [x.id]: x.followUps } };
+}
+
 /* ================= 입장 화면 ================= */
 const COMPANY_ORDER = ["현대자동차", "기아"];
 const ROLES = [
   { id: "구매", re: /구매|부품개발/ }, { id: "원가", re: /원가/ }, { id: "품질", re: /품질/ }, { id: "생산", re: /생산|물류|SCM/ },
   { id: "연구개발", re: /연구|개발팀|배터리개발/ }, { id: "재무", re: /재무/ }, { id: "영업", re: /영업/ }, { id: "기획", re: /기획/ },
-  { id: "인사·안전·IT", re: /인사|안전|IT|ESG|서비스/ },
+  { id: "인사·안전·IT", re: /인사|안전|IT|ESG|서비스/ }, { id: "국내·제네시스·전략", re: /국내사업|제네시스|상품전략/ },
 ];
 let role = new URLSearchParams(location.search).get("role") || "";
 const roleOf = id => ROLES.find(r => r.id === id);
 const teamFits = t => !role || roleOf(role).re.test(t.name);
-const fitsRole = sc => !role || sc.teams.some(teamFits);
+const fitsRole = sc => !role || [...sc.teams, ...(sc.extraTeams || [])].some(teamFits);
 function renderRoleChips(){
   const box = $("#roleChips"); box.innerHTML = "";
   [{ id: "" }, ...ROLES].forEach(r => {
@@ -475,7 +492,7 @@ function companies(){
 }
 function renderJoin(){
   renderRoleChips();
-  if (role && !st.team) { const t = S.teams.find(teamFits); if (t) st.team = t.id; }
+  if (role && !st.team) { const t = [...S.teams, ...(S.extraTeams || [])].find(teamFits); if (t) st.team = t.id; }
   const sg = $("#scGrid"); sg.innerHTML = "";
   companies().forEach(co => {
     const sec = el("div", "co-sec"), grid = el("div", "sc-grid");
@@ -501,6 +518,15 @@ function renderJoin(){
     b.onclick = () => { st.team = t.id; renderJoin(); };
     grid.append(b);
   });
+  (S.extraTeams || []).forEach(t => {
+    const b = el("button", "team-card" + (st.team === t.id ? " sel" : ""));
+    if (role && !teamFits(t)) b.style.opacity = ".55";
+    const nm = el("div", "nm"), dot = el("span", "dot"); dot.style.background = t.color;
+    nm.append(dot, document.createTextNode(t.name), el("span", "xb", "현대차 추가 직무"));
+    b.append(nm, el("div", "pr", "화두 · " + t.prompt));
+    b.onclick = () => { st.team = t.id; renderJoin(); };
+    grid.append(b);
+  });
   S.excludedTeams.forEach(x => { const b = el("div", "team-card excluded"); b.append(el("div", "nm", x.name + " — 이번 발제 제외"), el("div", "pr", x.reason)); grid.append(b); });
   checkJoin();
 }
@@ -513,6 +539,7 @@ function checkJoin(){
 }
 nameInput.addEventListener("keydown", e => { if (e.key === "Enter" && !$("#joinBtn").disabled) $("#joinBtn").click(); });
 $("#joinBtn").onclick = () => {
+  S = withTeam(S, st.team);
   st.name = nameInput.value.trim(); st.startedAt = new Date().toISOString();
   st.stage = $("#stageInput").value; st.interviewDate = $("#dateInput").value;
   $("#join").classList.add("hidden");
@@ -1181,6 +1208,7 @@ function resultPanel(body){
     const bar = el("div", "bar"), i = el("i"); i.style.width = sc[r.id].score * 20 + "%"; bar.append(i);
     row.append(top, bar, el("div", "tip", sc[r.id].tip)); body.append(row);
   });
+  sharePanel(body, sc);
   savePanel(body, sc);
   button(body, "결과 JSON 내보내기 (백엔드 전송 형식)", () => download(sessionPayload(sc)), false);
   button(body, "다른 발제·직무로 다시 하기", () => location.reload());
@@ -1236,6 +1264,85 @@ function download(obj){
   const a = el("a"); a.href = URL.createObjectURL(blob); a.download = `pt-session-${S.id}-${Date.now()}.json`; a.click(); URL.revokeObjectURL(a.href);
 }
 
+
+/* ================= 결과 공유 링크 ================= */
+const b64u = bytes => { let s = ""; bytes.forEach(b => s += String.fromCharCode(b)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const unb64u = str => Uint8Array.from(atob(str.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+async function pipe(bytes, stream){ return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer()); }
+async function encodeShare(obj){
+  const raw = new TextEncoder().encode(JSON.stringify(obj));
+  if ("CompressionStream" in window) { try { return "z" + b64u(await pipe(raw, new CompressionStream("deflate-raw"))); } catch {} }
+  return "j" + b64u(raw);
+}
+async function decodeShare(str){
+  const bytes = unb64u(str.slice(1));
+  const raw = str[0] === "z" ? await pipe(bytes, new DecompressionStream("deflate-raw")) : bytes;
+  return JSON.parse(new TextDecoder().decode(raw));
+}
+function sharePayload(score){
+  const keep = ["type", "x", "y", "w", "h", "text", "font", "size", "color", "bold", "italic", "align", "fill", "stroke", "strokeWidth", "dash", "radius", "role"];
+  return {
+    v: 1, s: S.id, t: st.team, n: st.name, at: new Date().toISOString().slice(0, 10),
+    els: ED.els.map(e => Object.fromEntries(keep.filter(k => ["x", "y", "w", "h"].includes(k) || (e[k] !== "" && e[k] !== 0 && e[k] !== false && e[k] != null)).map(k => [k, e[k]]))),
+    sc: Object.fromEntries(Object.entries(score).map(([k, v]) => [k, v.score])),
+    script: st.script, sec: st.presentSeconds,
+    rb: st.rebuttal ? { f: st.rebuttal.from, p: st.rebuttal.prompt, a: st.rebuttal.answer } : null,
+    qa: st.qa.map(q => ({ q: q.q, a: q.answer })),
+  };
+}
+function sharePanel(body, sc){
+  const c = el("div", "card"); body.append(c);
+  c.append(el("div", "k", "내 발표 공유"), el("div", "hint", "슬라이드·발표·답변·점수를 담은 링크를 만듭니다. 링크를 가진 사람은 누구나 볼 수 있습니다."));
+  const btn = el("button", "btn block primary", "공유 링크 만들기"), out = el("div");
+  btn.onclick = async () => {
+    const url = location.href.split("#")[0].split("?")[0] + "#r=" + await encodeShare(sharePayload(sc));
+    out.innerHTML = "";
+    const inp = el("input", "t"); inp.value = url; inp.readOnly = true; inp.onclick = () => inp.select();
+    const row = el("div", "btn-row");
+    const cp = el("button", "btn", "링크 복사"); cp.onclick = async () => { try { await navigator.clipboard.writeText(url); cp.textContent = "복사됨"; } catch { inp.select(); document.execCommand("copy"); cp.textContent = "복사됨"; } };
+    const op = el("button", "btn", "미리 보기"); op.onclick = () => window.open(url, "_blank");
+    row.append(cp, op);
+    if (navigator.share) { const sh = el("button", "btn", "공유하기"); sh.onclick = () => navigator.share({ title: `${st.name}님의 PT 면접 결과`, url }).catch(() => {}); row.append(sh); }
+    out.append(el("label", "f", `링크 (${url.length.toLocaleString()}자)`), inp, row);
+  };
+  c.append(btn, out);
+}
+async function showReport(code){
+  let d;
+  try { d = await decodeShare(code); } catch { alert("공유 링크가 올바르지 않습니다."); return false; }
+  const base = ALL.find(x => x.id === d.s); if (!base) { alert("이 링크의 발제를 찾을 수 없습니다."); return false; }
+  S = withTeam(base, d.t); st.team = d.t; st.name = d.n || "지원자";
+  ED.els = d.els.map((e, i) => mk({ ...e, id: "r" + i }));
+  $("#join").classList.add("hidden");
+  const R = $("#report"); R.classList.remove("hidden"); R.innerHTML = "";
+  const wrap = el("div", "join-inner");
+  const t = myTeam();
+  wrap.append(el("div", "k", `${S.company.name} · ${S.company.interviewType} · ${d.at || ""}`),
+    el("h1", null, `${st.name}님의 PT 면접 결과`),
+    el("p", "sub", `${S.agenda.title}`));
+  const tag = el("div", "card mine"); tag.append(el("div", "k", `직무 · ${t.name}`), el("div", null, t.prompt)); wrap.append(tag);
+  const holder = el("div", "deck-holder rep-deck"); wrap.append(holder);
+  const sc = el("div", "card"); sc.append(el("div", "k", "자가 점검 (규칙 기반 임시 채점)"));
+  const total = Object.values(d.sc || {}).reduce((a, b) => a + b, 0); sc.append(el("div", "total", `${total} / 25`));
+  (S.rubric || DEFAULT_RUBRIC).forEach(r => {
+    const v = (d.sc || {})[r.id] || 0, row = el("div", "score-row"), top = el("div", "row");
+    top.append(el("b", null, r.label), el("span", "hint", `${v}/5`));
+    const bar = el("div", "bar"), i = el("i"); i.style.width = v * 20 + "%"; bar.append(i); row.append(top, bar); sc.append(row);
+  });
+  wrap.append(sc);
+  const sp = el("div", "card"); sp.append(el("div", "k", `발표 스크립트${d.sec ? ` · ${d.sec}초` : ""}`), el("p", "pre", d.script || "(스크립트 없음)")); wrap.append(sp);
+  if (d.rb) { const rb = el("div", "card pressure"), w = teamById(d.rb.f); rb.append(el("div", "k", `${w ? w.name : ""}의 반박`), el("p", null, d.rb.p), el("div", "k", "내 답변"), el("p", "pre", d.rb.a || "(답변 없음)")); wrap.append(rb); }
+  (d.qa || []).forEach((q, i) => { const c = el("div", "card"); c.append(el("div", "k", `질문 ${i + 1}`), el("p", null, q.q), el("div", "k", "내 답변"), el("p", "pre", q.a || "(답변 없음)")); wrap.append(c); });
+  const cta = el("div", "btn-row");
+  const again = el("a", "btn primary", "나도 이 발제로 연습하기"); again.href = location.pathname + "?s=" + encodeURIComponent(S.id);
+  const home = el("a", "btn", "다른 발제 보기"); home.href = location.pathname;
+  cta.append(again, home); wrap.append(cta);
+  R.append(wrap);
+  requestAnimationFrame(() => renderPlayerSlide(holder));
+  document.title = `${st.name}님의 PT 면접 결과 · PT면접시뮬레이터`;
+  return true;
+}
+
 /* ================= 하단 컨트롤 ================= */
 $("#viewBtn").onclick = () => {
   if (!st.phase) return;
@@ -1271,7 +1378,8 @@ $("#leaveBtn").onclick = () => { if (confirm("면접을 종료하고 나갈까�
 /* ================= 시작 ================= */
 const want = new URLSearchParams(location.search).get("s");
 S = ALL.find(s => s.id === want) || ALL[0];
-renderJoin();
+if (location.hash.startsWith("#r=")) showReport(location.hash.slice(3)).then(ok => { if (!ok) renderJoin(); });
+else renderJoin();
 })();
 </script>
 </body>
