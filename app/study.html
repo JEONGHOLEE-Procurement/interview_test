@@ -92,7 +92,7 @@ a{color:#7fb6ff}
   const CFG = window.APP_CONFIG || {}, $ = s => document.querySelector(s);
   const ALL = (window.SCENARIOS || []).slice().sort((a, b) => a.id.localeCompare(b.id)); // 방 코드 뒤 두 자리 = 이 목록의 순번
   if (!window.supabase || !CFG.supabaseUrl) { $("#authMsg").textContent = "실시간 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요."; $("#authMsg").className = "msg err"; return; }
-  const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey);
+  const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { storage: window.sessionStorage } }); // 로그인은 탭별로 보관: 한 브라우저에서 탭마다 다른 계정으로 동시 접속 가능
   const next = new URLSearchParams(location.search).get("next");
   let mode = "login";
 
