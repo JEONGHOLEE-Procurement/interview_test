@@ -1,0 +1,229 @@
+<title>첫무대 스터디 방 테스트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 레이아웃: 인스타 캐러셀 4:5 카드를 순서대로 깔고, 각 카드에 실제 화면을 축소한 목업을 넣는다. 서비스 화면과 같은 다크 단일 테마. */
+:root{
+  --ground:#07090d; --card:#0f131b; --panel:#171c26; --line:#273042;
+  --ink:#eef0f4; --muted:#97a0ae; --blue:#2d8cff; --blue-soft:#12233d; --ok:#3ecf8e; --warn:#f5b041;
+  --display:"Black Han Sans","IBM Plex Sans KR","Apple SD Gothic Neo",sans-serif;
+  --body:"IBM Plex Sans KR","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);margin:0;padding:32px 16px 56px}
+.top{max-width:1120px;margin:0 auto 28px;display:grid;gap:8px}
+.top h1{font-family:var(--display);font-weight:400;font-size:clamp(26px,4vw,36px);margin:0;letter-spacing:.01em;text-wrap:balance}
+.top p{margin:0;color:var(--muted);font-size:14px;line-height:1.7;max-width:68ch}
+.top .note{color:var(--warn)}
+.grid{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:20px}
+
+/* 카드: 4:5, 내부 단위는 카드 너비 기준 cqw */
+.c{container-type:inline-size;aspect-ratio:4/5;max-width:100%;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;position:relative}
+.in{position:absolute;inset:0;padding:7cqw 7cqw 6cqw;display:flex;flex-direction:column;gap:3.6cqw}
+.meta{display:flex;justify-content:space-between;align-items:center;font-size:3.2cqw;color:var(--muted);letter-spacing:.06em}
+.meta b{color:var(--blue);font-weight:700}
+.step{font-family:var(--display);font-size:16cqw;line-height:.9;color:var(--blue)}
+h2{font-family:var(--display);font-weight:400;font-size:8.4cqw;line-height:1.15;margin:0;text-wrap:balance}
+.lead{font-size:4cqw;line-height:1.6;color:var(--muted);margin:0}
+.lead b{color:var(--ink);font-weight:700}
+.foot{margin-top:auto;font-size:3.4cqw;line-height:1.55;color:var(--muted);border-top:1px solid var(--line);padding-top:3cqw}
+.foot b{color:var(--warn);font-weight:700}
+
+/* 화면 목업 */
+.ui{background:var(--panel);border:1px solid var(--line);border-radius:3cqw;padding:4cqw;display:flex;flex-direction:column;gap:2.4cqw;font-size:3.4cqw}
+.tabs{display:flex;gap:1.6cqw}
+.tabs span{flex:1;text-align:center;padding:1.8cqw 0;border-radius:1.6cqw;background:#0f131b;color:var(--muted)}
+.tabs .on{background:var(--blue);color:#fff;font-weight:700}
+.f{display:grid;gap:.8cqw}
+.f i{font-style:normal;color:var(--muted);font-size:3cqw}
+.f span{background:#0b0e14;border:1px solid var(--line);border-radius:1.4cqw;padding:1.6cqw 2.2cqw;font-family:var(--mono);font-size:3.2cqw}
+.btn{text-align:center;padding:2.2cqw;border-radius:1.6cqw;background:var(--blue);color:#fff;font-weight:700}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:500}
+.tick{display:flex;gap:2cqw;align-items:flex-start;color:var(--muted);font-size:3cqw;line-height:1.5}
+.box{flex:none;width:3.4cqw;height:3.4cqw;border-radius:.8cqw;background:var(--blue);margin-top:.5cqw;position:relative}
+.box::after{content:"";position:absolute;left:1.1cqw;top:.4cqw;width:.9cqw;height:1.8cqw;border:solid #fff;border-width:0 .5cqw .5cqw 0;transform:rotate(45deg)}
+.mark{outline:.6cqw solid var(--warn);outline-offset:.8cqw}
+.url{font-family:var(--mono);font-size:3.5cqw;background:var(--blue-soft);color:#cfe3ff;border-radius:2cqw;padding:3cqw 3.4cqw;word-break:break-all;line-height:1.45}
+.code6{font-family:var(--mono);font-size:9cqw;letter-spacing:1.6cqw;text-align:center;color:var(--ink);padding:1cqw 0}
+.mail-h{display:flex;justify-content:space-between;color:var(--muted);font-size:3cqw;border-bottom:1px solid var(--line);padding-bottom:2cqw}
+.room{font-family:var(--mono);font-size:7cqw;text-align:center;letter-spacing:.4cqw;color:var(--ink)}
+.ppl{list-style:none;margin:0;padding:0;display:grid;gap:1.8cqw}
+.ppl li{display:flex;align-items:center;gap:2cqw}
+.ppl .d{width:2.4cqw;height:2.4cqw;border-radius:50%}
+.ppl .s{margin-left:auto;color:var(--muted);font-size:3cqw}
+.count{color:var(--ok);font-weight:700;font-size:3.4cqw}
+.or{display:flex;align-items:center;gap:2cqw;color:var(--muted);font-size:3cqw}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.flow{display:grid;gap:2cqw;font-size:3.8cqw;line-height:1.5}
+.flow div{display:flex;gap:2.4cqw;align-items:baseline}
+.flow em{font-style:normal;font-family:var(--mono);color:var(--blue);font-size:3.4cqw;flex:none}
+
+/* 체크리스트 카드 */
+.chk{list-style:none;margin:0;padding:0;display:grid;gap:2.3cqw;font-size:3.8cqw;line-height:1.45}
+.chk li{display:flex;gap:2.6cqw;align-items:flex-start}
+.chk .sq{flex:none;width:4.4cqw;height:4.4cqw;border:.5cqw solid var(--muted);border-radius:1cqw;margin-top:.4cqw}
+.chk small{display:block;color:var(--muted);font-size:3.1cqw}
+
+/* 표지 */
+.cover .in{justify-content:space-between;background:radial-gradient(ellipse 90% 60% at 80% 0%,#163259 0%,transparent 70%)}
+.cover h2{font-size:12cqw;line-height:1.08}
+.cover h2 span{color:var(--blue)}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:2.4cqw}
+.facts div{background:var(--panel);border:1px solid var(--line);border-radius:2.4cqw;padding:3cqw}
+.facts i{display:block;font-style:normal;color:var(--muted);font-size:2.9cqw;margin-bottom:.8cqw}
+.facts b{font-size:4.2cqw}
+</style>
+
+<header class="top">
+  <h1>첫무대 스터디 방 테스트</h1>
+  <p>친구들에게 보낼 9장짜리 카드 안내입니다. 한 장씩 캡처해서 인스타 캐러셀이나 단톡방에 올리면 됩니다. 1~4번은 회원가입, 5~7번은 동시접속 확인, 마지막 장은 결과를 알려 달라는 체크리스트입니다.</p>
+  <p class="note">보내기 전에 Supabase의 Confirm signup 메일 양식에 6자리 코드({{ .Token }})를 넣었는지 확인하세요. 넣지 않았다면 3번 카드의 코드 입력 방법은 쓸 수 없고 메일 링크로만 인증됩니다.</p>
+</header>
+
+<main class="grid">
+
+  <!-- 0. 표지 -->
+  <article class="c cover"><div class="in">
+    <div class="meta"><span>첫무대 · PT 면접 스터디</span><b>1 / 9</b></div>
+    <h2>같이 들어와서<br><span>면접 연습 방</span><br>테스트해 줄래?</h2>
+    <p class="lead">각자 계정을 만들고 같은 방에 <b>동시에 4명</b>이 들어가지는지 확인하는 테스트예요. 순서대로 따라 하고, 막힌 곳만 알려 주면 됩니다.</p>
+    <div class="facts">
+      <div><i>걸리는 시간</i><b>약 10분</b></div>
+      <div><i>준비물</i><b>이메일 1개</b></div>
+      <div><i>인원</i><b>최대 4명</b></div>
+    </div>
+  </div></article>
+
+  <!-- 1. 접속 -->
+  <article class="c"><div class="in">
+    <div class="meta"><span>회원가입</span><b>2 / 9</b></div>
+    <div class="step">01</div>
+    <h2>이 주소로 들어가기</h2>
+    <div class="url">jeongholee-procurement.github.io<br>/interview_test/study.html</div>
+    <p class="lead">휴대폰이든 PC든 상관없어요. <b>“면접 스터디 방”</b> 화면이 뜨면 위쪽에서 <b>회원가입</b> 탭을 누르세요.</p>
+    <div class="ui"><div class="tabs"><span>로그인</span><span class="on mark">회원가입</span></div></div>
+    <div class="foot">카톡 안에서 링크가 이상하게 열리면 <b>오른쪽 위 ⋯ → 다른 브라우저로 열기</b>를 누르세요.</div>
+  </div></article>
+
+  <!-- 2. 가입 -->
+  <article class="c"><div class="in">
+    <div class="meta"><span>회원가입</span><b>3 / 9</b></div>
+    <div class="step">02</div>
+    <h2>네 칸 채우고 가입</h2>
+    <div class="ui">
+      <div class="f"><i>이름 (스터디에서 보일 이름)</i><span>김첫무</span></div>
+      <div class="f"><i>이메일</i><span>me@example.com</span></div>
+      <div class="f"><i>비밀번호</i><span>••••••••</span></div>
+      <div class="tick"><span class="box"></span>저장 동의 체크</div>
+      <div class="btn">회원가입</div>
+    </div>
+    <div class="foot">비밀번호는 <b>8자 이상</b>. 이메일은 지금 바로 열어 볼 수 있는 주소로 쓰세요.</div>
+  </div></article>
+
+  <!-- 3. 메일 인증 -->
+  <article class="c"><div class="in">
+    <div class="meta"><span>회원가입</span><b>4 / 9</b></div>
+    <div class="step">03</div>
+    <h2>메일로 온 인증 처리</h2>
+    <div class="ui">
+      <div class="mail-h"><span>[첫무대] 이메일 인증 코드</span><span>방금</span></div>
+      <div class="code6">482913</div>
+      <div class="or">둘 중 하나</div>
+      <div class="flow">
+        <div><em>A</em><span>코드를 가입 화면 <b>“인증 코드”</b> 칸에 넣고 <b>코드로 인증하기</b></span></div>
+        <div><em>B</em><span>메일 속 <b>이메일 인증하기</b> 링크 누르기</span></div>
+      </div>
+    </div>
+    <div class="foot">메일이 안 보이면 <b>스팸함</b>부터. 그래도 없으면 1분 뒤 <b>인증 메일 다시 받기</b>를 누르세요. 위 숫자는 예시예요.</div>
+  </div></article>
+
+  <!-- 4. 로비 -->
+  <article class="c"><div class="in">
+    <div class="meta"><span>회원가입</span><b>5 / 9</b></div>
+    <div class="step">04</div>
+    <h2>내 이름이 보이면 가입 끝</h2>
+    <div class="ui">
+      <div style="display:flex;justify-content:space-between"><span><b>김첫무</b>님 <span style="color:var(--muted)">me@example.com</span></span><span style="color:var(--muted);text-decoration:underline">로그아웃</span></div>
+    </div>
+    <div class="ui">
+      <b>새 스터디 방 만들기</b>
+      <div class="f"><i>발제</i><span>현대자동차 · 원가 절감</span></div>
+      <div class="btn ghost">방 만들기</div>
+    </div>
+    <p class="lead">이 화면까지 왔으면 체크리스트 <b>①②③</b> 완료예요.</p>
+    <div class="foot">창을 닫으면 로그아웃돼요. 다시 들어올 땐 <b>로그인</b> 탭에서 같은 이메일·비밀번호로.</div>
+  </div></article>
+
+  <!-- 5. 방장 -->
+  <article class="c"><div class="in">
+    <div class="meta"><span>동시접속</span><b>6 / 9</b></div>
+    <div class="step">05</div>
+    <h2>방장 1명만: 방 만들고 초대</h2>
+    <div class="flow">
+      <div><em>1</em><span>발제를 하나 고르고 <b>방 만들기</b></span></div>
+      <div><em>2</em><span>방 화면에서 <b>초대 링크 복사</b></span></div>
+      <div><em>3</em><span>단톡방에 링크 붙여넣기</span></div>
+    </div>
+    <div class="ui">
+      <span style="color:var(--muted);font-size:3cqw">현대자동차 · 원가 절감</span>
+      <div class="room">K7P2Q-03</div>
+      <div style="display:flex;gap:2cqw"><div class="btn mark" style="flex:1">초대 링크 복사</div><div class="btn ghost" style="flex:1">다른 방으로</div></div>
+    </div>
+    <div class="foot">방을 만든 사람이 <b>방장</b>이에요. 방장이 단계를 넘겨야 모두의 화면이 같이 넘어가요.</div>
+  </div></article>
+
+  <!-- 6. 친구 입장 -->
+  <article class="c"><div class="in">
+    <div class="meta"><span>동시접속</span><b>7 / 9</b></div>
+    <div class="step">06</div>
+    <h2>나머지는 같은 방으로 입장</h2>
+    <div class="flow">
+      <div><em>A</em><span>단톡방의 <b>초대 링크</b>를 누르기 (로그인 안 돼 있으면 로그인 후 자동으로 방으로 가요)</span></div>
+    </div>
+    <div class="or">또는</div>
+    <div class="ui">
+      <b>방 코드로 들어가기</b>
+      <div class="f"><i>방 코드</i><span>K7P2Q-03</span></div>
+      <div class="btn ghost">입장</div>
+    </div>
+    <div class="foot">방 코드는 <b>영문 5자 - 숫자 2자</b>예요. 위 코드는 예시라서 방장이 보낸 코드를 넣으세요.</div>
+  </div></article>
+
+  <!-- 7. 동시접속 확인 -->
+  <article class="c"><div class="in">
+    <div class="meta"><span>동시접속</span><b>8 / 9</b></div>
+    <div class="step">07</div>
+    <h2>참가자 목록에 서로 보이나요?</h2>
+    <div class="ui">
+      <b>참가자</b>
+      <ul class="ppl">
+        <li><span class="d" style="background:#2d8cff"></span>김첫무 (나)<span class="s">방장 · 구매전략팀</span></li>
+        <li><span class="d" style="background:#3ecf8e"></span>이대기<span class="s">협력사관리팀</span></li>
+        <li><span class="d" style="background:#f5b041"></span>박입사<span class="s">직무 선택 중</span></li>
+        <li><span class="d" style="background:#555"></span>최합격<span class="s">직무 선택 중</span></li>
+      </ul>
+      <span class="count">4/4명 접속</span>
+    </div>
+    <p class="lead">각자 <b>다른 직무</b>를 골라 입장하고, 방장이 <b>다음 단계</b>를 누르면 모두의 화면이 같이 넘어가는지 봐 주세요.</p>
+    <div class="foot">이름이 안 보이는 사람이 있으면 그 사람만 <b>새로고침</b> 한 번 해 보고, 그래도 안 되면 캡처해 주세요.</div>
+  </div></article>
+
+  <!-- 8. 체크리스트 -->
+  <article class="c"><div class="in">
+    <div class="meta"><span>결과 알려 주기</span><b>9 / 9</b></div>
+    <h2>된 것에 체크해서 보내 주세요</h2>
+    <ul class="chk">
+      <li><span class="sq"></span><span>① 회원가입 버튼까지 눌렀다</span></li>
+      <li><span class="sq"></span><span>② 인증 메일이 왔다<small>도착까지 몇 분 걸렸는지, 스팸함이었는지</small></span></li>
+      <li><span class="sq"></span><span>③ 인증 후 내 이름이 보였다<small>코드(A)·링크(B) 중 무엇으로 했는지</small></span></li>
+      <li><span class="sq"></span><span>④ 방에 들어갔다</span></li>
+      <li><span class="sq"></span><span>⑤ 참가자 목록에 모두 보였다<small>“n/4명 접속”의 n</small></span></li>
+      <li><span class="sq"></span><span>⑥ 방장이 넘기면 내 화면도 넘어갔다</span></li>
+    </ul>
+    <div class="foot">막힌 곳이 있으면 <b>번호 + 그 화면 캡처 + 폰/PC·브라우저</b>만 보내 주면 돼요. 고마워요!</div>
+  </div></article>
+
+</main>
