@@ -60,6 +60,14 @@ a{color:#7fb6ff}
       <button class="btn primary" id="authBtn">로그인</button>
     </form>
     <div class="msg" id="authMsg"></div>
+    <!-- 메일 인증: 링크 대신 메일 속 6자리 코드로도 인증 -->
+    <div id="verifyBox" class="hidden">
+      <label for="otp">메일로 받은 인증 코드 (6자리)</label>
+      <input id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
+      <button class="btn primary" id="otpBtn" type="button">코드로 인증하기</button>
+      <button class="btn" id="resendBtn" type="button">인증 메일 다시 받기</button>
+      <div class="hint">메일의 링크가 열리지 않거나 만료됐다고 나오면 코드를 입력하거나 메일을 다시 받으세요. 메일이 안 보이면 스팸함을 확인하세요.</div>
+    </div>
   </section>
 
   <!-- 로비 -->
@@ -97,7 +105,17 @@ a{color:#7fb6ff}
     msg("", "");
   });
   const msg = (t, c) => { $("#authMsg").textContent = t; $("#authMsg").className = "msg " + c; };
-  const KR = { "Invalid login credentials": "이메일 또는 비밀번호가 맞지 않습니다.", "Email not confirmed": "이메일 인증을 먼저 완료하세요. 받은편지함을 확인하세요.", "User already registered": "이미 가입된 이메일입니다. 로그인하세요." };
+  const KR = { "Invalid login credentials": "이메일 또는 비밀번호가 맞지 않습니다.", "Email not confirmed": "이메일 인증이 아직 안 됐습니다. 메일 속 코드를 입력하거나 인증 메일을 다시 받으세요.", "User already registered": "이미 가입된 이메일입니다. 로그인하세요.", "Token has expired or is invalid": "코드가 맞지 않거나 만료됐습니다. 인증 메일을 다시 받으세요." };
+  const redirectTo = location.origin + location.pathname + location.search; // 인증 링크가 돌아올 곳 = 지금 이 페이지
+  const verify = on => $("#verifyBox").classList.toggle("hidden", !on);
+
+  // 인증 링크가 만료·재사용됐을 때 Supabase가 #error=...로 돌려보낸다
+  const hash = new URLSearchParams(location.hash.slice(1));
+  if (hash.get("error")) {
+    msg(hash.get("error_code") === "otp_expired" ? "인증 링크가 만료됐거나 이미 사용됐습니다. 이메일을 입력하고 인증 메일을 다시 받거나, 이미 인증했다면 그냥 로그인하세요." : "인증에 실패했습니다: " + (hash.get("error_description") || hash.get("error")), "err");
+    verify(true);
+    history.replaceState(null, "", redirectTo);
+  }
 
   $("#authForm").onsubmit = async e => {
     e.preventDefault();
@@ -108,16 +126,39 @@ a{color:#7fb6ff}
         const name = $("#name").value.trim();
         if (!name) throw new Error("이름을 입력하세요.");
         if (!$("#agree").checked) throw new Error("저장 동의에 체크해야 가입할 수 있습니다.");
-        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: location.href.split("#")[0] } });
+        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: redirectTo } });
         if (error) throw error;
-        if (!data.session) { msg("가입 확인 메일을 보냈습니다. 메일의 링크를 누른 뒤 로그인하세요.", "ok"); return; }
+        if (data.user && !data.user.identities?.length) throw new Error("User already registered");
+        if (!data.session) { msg("가입 확인 메일을 보냈습니다. 메일의 링크를 누르거나 아래에 코드를 입력하세요.", "ok"); verify(true); return; }
       } else {
         const { error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
       await show();
-    } catch (err) { msg(KR[err.message] || err.message, "err"); }
+    } catch (err) { msg(KR[err.message] || err.message, "err"); if (err.message === "Email not confirmed") verify(true); }
     finally { $("#authBtn").disabled = false; }
+  };
+  $("#otpBtn").onclick = async () => {
+    const email = $("#email").value.trim(), token = $("#otp").value.replace(/\D/g, "");
+    if (!email || !token) return msg("이메일과 인증 코드를 입력하세요.", "err");
+    $("#otpBtn").disabled = true; msg("확인 중…", "");
+    try {
+      const { error } = await sb.auth.verifyOtp({ email, token, type: "email" });
+      if (error) throw error;
+      verify(false); await show();
+    } catch (err) { msg(KR[err.message] || err.message, "err"); }
+    finally { $("#otpBtn").disabled = false; }
+  };
+  $("#resendBtn").onclick = async () => {
+    const email = $("#email").value.trim();
+    if (!email) return msg("위에 가입한 이메일을 입력하세요.", "err");
+    $("#resendBtn").disabled = true;
+    try {
+      const { error } = await sb.auth.resend({ type: "signup", email, options: { emailRedirectTo: redirectTo } });
+      if (error) throw error;
+      msg("인증 메일을 다시 보냈습니다. 가장 최근 메일의 링크나 코드를 쓰세요.", "ok");
+    } catch (err) { msg(/security purposes|rate limit/i.test(err.message) ? "잠시 후(1분 뒤) 다시 시도하세요." : (KR[err.message] || err.message), "err"); }
+    finally { $("#resendBtn").disabled = false; }
   };
   $("#logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
@@ -147,6 +188,7 @@ a{color:#7fb6ff}
     $("#meName").textContent = session.user.user_metadata?.name || session.user.email.split("@")[0];
     $("#meEmail").textContent = session.user.email;
   }
+  sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN") setTimeout(show, 0); }); // 인증 링크로 돌아온 경우 자동 로그인
   show();
 })();
 </script>
