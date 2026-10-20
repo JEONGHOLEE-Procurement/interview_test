@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PT면접시뮬레이터</title>
 <script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="data/scenario-hyundai-india.js"></script>
 <script src="data/scenario-hmc-cost.js"></script>
 <script src="data/scenario-hmc-na.js"></script>
@@ -265,6 +266,18 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
 .rep-deck{height:min(56vw,540px);margin:12px 0 16px}
 .pre{white-space:pre-wrap;margin:6px 0 0}
 #report .btn{text-decoration:none}
+.chat-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.chat-item{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:6px}
+.chat-item b{display:block;font-size:11px;color:#9fd0ff;margin-bottom:2px}
+.chat-item.mine{border-color:rgba(45,140,255,.5);background:rgba(45,140,255,.08)}
+.chat-item.sys{background:none;border-style:dashed;color:var(--muted)}
+.chat-box{display:flex;gap:6px;align-items:stretch;margin:6px 0 10px}
+.chat-box textarea{flex:1}
+.chat-box .btn{padding:8px 12px}
+.toast{position:absolute;right:16px;top:12px;z-index:40;max-width:min(420px,calc(100% - 32px));background:rgba(23,26,33,.96);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
+.tile .badge.human{background:#2bb3a3}
+.avatar.human{border-color:#9fd0ff}
+.room-card .room-code{font-size:28px;font-weight:800;letter-spacing:.12em;margin:4px 0}
 .join-need{font-size:12px;color:var(--warn);margin-top:6px;min-height:18px}
 
 @media (max-width:900px){
@@ -389,6 +402,7 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
       <div class="near-card hidden" id="nearCard"></div>
     </div>
     <div class="caption hidden" id="caption"></div>
+    <div class="toast hidden" id="toast"></div>
   </section>
 
   <aside class="side">
@@ -396,6 +410,7 @@ kbd{background:#0f1218;border:1px solid var(--line);border-radius:4px;padding:0 
       <button data-tab="act" class="on">진행</button>
       <button data-tab="agenda">발제</button>
       <button data-tab="log">회의록</button>
+      <button data-tab="chat" id="chatTab" class="hidden">채팅</button>
     </div>
     <div class="side-body" id="sideBody"></div>
   </aside>
@@ -433,7 +448,7 @@ const FONTS = {
 };
 
 /* ---------------- 상태 ---------------- */
-const PHASES = [
+let PHASES = [
   { id: "brief", label: "발제" }, { id: "meeting", label: "부서별 발표" }, { id: "prep", label: "내 PPT 만들기" },
   { id: "present", label: "발표" }, { id: "rebuttal", label: "반박 대응" }, { id: "qa", label: "질의응답" }, { id: "result", label: "결과" },
 ];
@@ -491,6 +506,7 @@ function companies(){
   return [...map].map(([name, items]) => ({ name, items })).sort((a, b) => (COMPANY_ORDER.indexOf(a.name) + 99) % 99 - (COMPANY_ORDER.indexOf(b.name) + 99) % 99);
 }
 function renderJoin(){
+  if (RT.on) return RT.me && renderRoomJoin();
   renderRoleChips();
   if (role && !st.team) { const t = [...S.teams, ...(S.extraTeams || [])].find(teamFits); if (t) st.team = t.id; }
   const sg = $("#scGrid"); sg.innerHTML = "";
@@ -539,6 +555,7 @@ function checkJoin(){
 }
 nameInput.addEventListener("keydown", e => { if (e.key === "Enter" && !$("#joinBtn").disabled) $("#joinBtn").click(); });
 $("#joinBtn").onclick = () => {
+  if (RT.on && memberOfTeam(st.team)) { alert("다른 스터디원이 방금 고른 직무입니다. 다른 직무를 고르세요."); st.team = null; return renderJoin(); }
   S = withTeam(S, st.team);
   st.name = nameInput.value.trim(); st.startedAt = new Date().toISOString();
   st.stage = $("#stageInput").value; st.interviewDate = $("#dateInput").value;
@@ -550,7 +567,8 @@ $("#joinBtn").onclick = () => {
   ED.els = templateElements();
   buildRoom();
   setPhase("brief");
-  say("iv1", `${st.name}님 반갑습니다. ${S.company.name} PT 면접을 시작하겠습니다. 화면에 띄운 발제를 확인하시고, ${myTeam().name} 입장에서 화두를 준비해 주세요.`);
+  say("iv1", RT.on ? `스터디원 여러분 반갑습니다. ${S.company.name} PT 면접 스터디를 시작하겠습니다. 화면의 발제를 확인하시고 각자 맡은 부서 입장에서 준비해 주세요.` : `${st.name}님 반갑습니다. ${S.company.name} PT 면접을 시작하겠습니다. 화면에 띄운 발제를 확인하시고, ${myTeam().name} 입장에서 화두를 준비해 주세요.`);
+  if (RT.on) roomEntered();
 };
 
 /* ================= 단계 ================= */
@@ -566,17 +584,19 @@ function setPhase(p){
   if (p === "brief") startTimer(S.agenda.prepMinutes * 60, "준비");
   if (p === "meeting") return startMeeting();
   if (p === "prep") { st.speakerId = "me"; hideCaption(); startTimer(S.agenda.prepMinutes * 60, "준비"); }
-  if (p === "present") { st.speakerId = "me"; startTimer(S.agenda.speakSeconds, "발표"); }
+  if (p === "present") { st.speakerId = RT.on ? presenterSpeaker() : "me"; RT.myDone = false; startTimer(S.agenda.speakSeconds, "발표"); }
   if (p === "rebuttal") { startRebuttal(); return renderSide(); }
   if (p === "qa") return startQA();
   if (p === "result") { st.speakerId = null; hideCaption(); }
+  if (RT.on) sendState();
   renderSide(); renderStage();
 }
 
 /* ================= 타이머 ================= */
-function startTimer(seconds, label){
-  stopTimer();
-  const end = Date.now() + seconds * 1000, t = $("#timer");
+function startTimer(seconds, label){ startTimerAt(Date.now() + seconds * 1000, label); }
+function startTimerAt(end, label){
+  stopTimer(); st.timerInfo = { end, label };
+  const t = $("#timer");
   const tick = () => {
     const left = Math.round((end - Date.now()) / 1000), a = Math.abs(left);
     t.textContent = `${label} ${left < 0 ? "+" : ""}${String(Math.floor(a / 60)).padStart(2, "0")}:${String(a % 60).padStart(2, "0")}`;
@@ -584,12 +604,13 @@ function startTimer(seconds, label){
   };
   tick(); st.timer = setInterval(tick, 500);
 }
-function stopTimer(){ clearInterval(st.timer); $("#timer").textContent = "--:--"; $("#timer").className = "timer"; }
+function stopTimer(){ clearInterval(st.timer); st.timerInfo = null; $("#timer").textContent = "--:--"; $("#timer").className = "timer"; }
 const elapsed = p => Math.round((Date.now() - (st.phaseStartedAt[p] || Date.now())) / 1000);
 
 /* ================= 발언 / 자막 / 회의록 ================= */
 function who(id){
   if (id === "me") return { name: st.name, team: myTeam().name, color: "#2d8cff" };
+  if (id && id.startsWith("h:")) { const m = RT.members.find(x => x.uid === id.slice(2)), t = m && teamById(m.team); return { name: m ? m.name : "스터디원", team: t ? t.name : "스터디원", color: t ? t.color : "#2d8cff" }; }
   const iv = S.interviewers.find(i => i.id === id); if (iv) return { name: iv.name, team: iv.title, color: iv.color };
   const t = teamById(id); return { name: t.npc.name, team: t.name, color: t.color };
 }
@@ -608,18 +629,19 @@ function say(id, text, kind = "speech", onDone){
     speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "ko-KR"; u.rate = 1.1;
     u.onend = u.onerror = () => { spoken = true; finish(); }; speechSynthesis.speak(u);
   }
+  if (RT.on && RT.isHost && !RT.applying) { RT.say = { id: id === "me" ? "h:" + RT.me.uid : id, text, kind }; RT.sayKey = Date.now() + Math.random(); sendState(); }
   renderStage(text);
 }
 function hideCaption(){ $("#caption").classList.add("hidden"); clearInterval(typing); sayToken++; if ("speechSynthesis" in window) speechSynthesis.cancel(); }
 
 /* ================= 부서별 발표 (단계별 진행) ================= */
-function startMeeting(){ MT.queue = S.teams.filter(t => t.id !== st.team).map(t => t.id); nextTeam(); }
+function startMeeting(){ MT.queue = S.teams.filter(t => t.id !== st.team && !(RT.on && humanTeams().has(t.id))).map(t => t.id); nextTeam(); }
 function nextTeam(){
   clearTimeout(MT.timer);
   const id = MT.queue.shift();
   if (!id) {
     MT.team = null;
-    say("iv1", `각 부서 발표 잘 들었습니다. 이제 ${myTeam().name} 차례입니다. 다른 부서 주장을 고려해 1장짜리 PPT를 직접 만들어 주세요.`);
+    say("iv1", RT.on ? "각 부서 발표 잘 들었습니다. 이제 스터디원 여러분 차례입니다. 다른 부서 주장을 고려해 각자 1장짜리 PPT를 만들어 주세요." : `각 부서 발표 잘 들었습니다. 이제 ${myTeam().name} 차례입니다. 다른 부서 주장을 고려해 1장짜리 PPT를 직접 만들어 주세요.`);
     return renderSide();
   }
   MT.team = id; MT.step = 0; st.presented.add(id); playStep();
@@ -792,10 +814,12 @@ function lineNode(e){
   }
   s.dataset.id = e.id; return s;
 }
-function renderPlayerSlide(holder){
+function renderPlayerSlide(holder, view){
+  const v = view || { els: ED.els, team: myTeam().name, name: st.name };
   const d = mountDeck(holder);
-  chrome(d, { nav: ["1. 결론", "2. 근거", "3. 실행", "4. 리스크"], page: `${myTeam().name}  |  ${st.name}`, foot: footnote() });
-  ED.els.forEach(e => d.append(renderElement(e)));
+  chrome(d, { nav: ["1. 결론", "2. 근거", "3. 실행", "4. 리스크"], page: `${v.team}  |  ${v.name}`, foot: footnote() });
+  v.els.forEach(e => d.append(renderElement(e)));
+  if (v.waiting) d.append(at(el("div", "d-title sm", `${v.name}님의 슬라이드를 기다리는 중…`), 48, 240, 860));
   return d;
 }
 const elText = role => ED.els.filter(e => e.role === role).map(e => e.text || "");
@@ -941,7 +965,11 @@ document.addEventListener("keydown", ev => {
 /* ================= 줌 화면 ================= */
 function participants(){
   const list = S.interviewers.map(i => ({ id: i.id, ...who(i.id) }));
-  S.teams.forEach(t => list.push(t.id === st.team ? { id: "me", ...who("me"), me: true } : { id: t.id, ...who(t.id) }));
+  S.teams.forEach(t => {
+    if (t.id === st.team) return list.push({ id: "me", ...who("me"), me: true });
+    const m = memberOfTeam(t.id);
+    list.push(m ? { id: "h:" + m.uid, ...who("h:" + m.uid), human: true } : { id: t.id, ...who(t.id) });
+  });
   return list;
 }
 function makeTile(p){
@@ -950,6 +978,7 @@ function makeTile(p){
   else { const f = el("div", "face", initials(p.name)); f.style.background = p.color; tile.append(f); }
   tile.append(el("div", "label", `${p.name} · ${p.team}`));
   if (p.me) tile.append(el("div", "badge", "나"));
+  if (p.human) tile.append(el("div", "badge human", "스터디원"));
   return tile;
 }
 function shareKind(){
@@ -966,7 +995,7 @@ function renderZoom(){
   const holder = $("#shareHolder");
   if (kind === "agenda") renderAgendaSlide(holder);
   if (kind === "npc") renderNpcSlide(holder, teamById(MT.team), MT.step);
-  if (kind === "player") renderPlayerSlide(holder);
+  if (kind === "player") renderPlayerSlide(holder, presenterView());
 }
 function renderStage(text){
   const editing = st.phase === "prep" && st.view === "zoom";
@@ -990,6 +1019,7 @@ function buildRoom(){
     avatars[t.id] = t.id === st.team ? addAvatar(room, "", "내 자리", t.color, seat, "seat-empty") : addAvatar(room, initials(t.npc.name), t.name, t.color, seat);
   });
   avatars.me = addAvatar(room, initials(st.name), `${st.name} (나)`, "#2d8cff", st.me, "me");
+  updateRoomAvatars();
   room.addEventListener("click", e => { const r = room.getBoundingClientRect(), k = r.width / 1000; walkTo((e.clientX - r.left) / k, (e.clientY - r.top) / k); });
   fitRoom(); window.addEventListener("resize", fitRoom);
 }
@@ -1007,7 +1037,7 @@ function moveMe(dx, dy){
   const nx = st.me.x + dx, ny = st.me.y + dy;
   if (!blocked(nx, st.me.y)) st.me.x = nx;
   if (!blocked(st.me.x, ny)) st.me.y = ny;
-  avatars.me.style.left = st.me.x + "px"; avatars.me.style.top = st.me.y + "px"; checkNear();
+  avatars.me.style.left = st.me.x + "px"; avatars.me.style.top = st.me.y + "px"; checkNear(); sendPos();
 }
 let walking = null;
 function walkTo(tx, ty){
@@ -1037,6 +1067,8 @@ function checkNear(){
   const near = S.teams.filter(t => t.id !== st.team).map(t => ({ t, d: Math.hypot(SEATS[t.seat].x - st.me.x, SEATS[t.seat].y - st.me.y) })).sort((a, b) => a.d - b.d)[0];
   if (!near || near.d > 95) return card.classList.add("hidden");
   const t = near.t; st.visited.add(t.id); card.classList.remove("hidden"); card.innerHTML = "";
+  const hm = memberOfTeam(t.id);
+  if (hm) { const sl = RT.slides[hm.uid]; card.append(el("h4", null, `${t.name} · 스터디원 ${hm.name}`), el("div", "stance", "화두 · " + t.prompt), el("p", null, sl ? "슬라이드 · " + (sl.title || "(제목 미정)") : "슬라이드 준비 중")); return; }
   const h = el("h4"), dot = el("span"); dot.style.cssText = `width:10px;height:10px;border-radius:50%;background:${t.color}`;
   h.append(dot, document.createTextNode(`${t.name} · ${t.npc.name}`));
   card.append(h, el("div", "stance", "화두 · " + t.prompt));
@@ -1047,7 +1079,7 @@ function renderRoomScreen(){
   const scr = $("#roomScreen"); scr.innerHTML = "";
   const kind = st.phase === "prep" ? "player" : shareKind();
   if (kind === "npc") { const t = teamById(MT.team); scr.append(el("b", null, t.npc.slide.title.replace(/\n/g, " ")), el("span", null, `${t.name} 발표 중 · ${MT.step + 1}/4`)); }
-  else if (kind === "player") scr.append(el("b", null, slideTitle() || "(제목 미정)"), el("span", null, `${myTeam().name} · ${st.name}`));
+  else if (kind === "player") { const v = presenterView(); scr.append(el("b", null, (v ? v.title : slideTitle()) || "(제목 미정)"), el("span", null, v ? `${v.team} · ${v.name}` : `${myTeam().name} · ${st.name}`)); }
   else scr.append(el("b", null, "오늘의 발제"), el("span", null, S.agenda.title.length > 34 ? S.agenda.title.slice(0, 34) + "…" : S.agenda.title));
 }
 function renderRoom(text){
@@ -1099,6 +1131,8 @@ function teamList(){
   S.teams.filter(t => t.id !== st.team).forEach(t => {
     const now = MT.team === t.id, done = st.presented.has(t.id) && !now;
     const li = el("li", now ? "now" : ""), dot = el("span", "dot"); dot.style.background = t.color;
+    const hm = memberOfTeam(t.id);
+    if (hm) { li.append(dot, el("span", null, `${t.name} — 스터디원 ${hm.name}`), el("span", "st", "내 PPT 차례에 발표")); ul.append(li); return; }
     li.append(dot, el("span", null, `${t.name} — ${t.npc.stance}`), el("span", "st", now ? `발표 중 ${MT.step + 1}/4` : done ? "완료" : "대기"));
     ul.append(li);
   });
@@ -1106,9 +1140,11 @@ function teamList(){
 }
 function renderSide(){
   const body = $("#sideBody"); body.innerHTML = "";
+  if (st.tab === "chat" && RT.on) return chatPanel(body);
   if (st.tab === "agenda") return agendaPanel(body);
   if (st.tab === "log") return logPanel(body);
   const P = st.phase;
+  if (RT.on) return roomSide(body, P);
   if (P === "brief") {
     body.append(myPromptCard());
     const c = el("div", "card"); c.append(el("div", "k", "진행 순서"));
@@ -1178,7 +1214,8 @@ function renderSide(){
 function selfScore(){
   const t = myTeam();
   const texts = ED.els.map(e => e.text || "").filter(filled), slideText = texts.join(" ");
-  const all = [slideText, st.script, st.rebuttal?.answer || "", ...st.qa.map(q => q.answer)].join(" ");
+  const myTalk = RT.on && RT.me ? RT.chat.filter(m => m.uid === RT.me.uid).map(m => m.text).join(" ") : "";
+  const all = [slideText, st.script, st.rebuttal?.answer || "", myTalk, ...st.qa.map(q => q.answer)].join(" ");
   const others = S.teams.filter(x => x.id !== st.team);
   const kw = t.keywords.filter(k => all.includes(k)).length;
   const facts = (S.factTokens || []).filter(k => all.includes(k)).length + Math.min(3, (all.match(/\d+(\.\d+)?\s*(%|만|억|조|대|개월|년)/g) || []).length);
@@ -1193,7 +1230,7 @@ function selfScore(){
   return {
     fit: { score: clamp(1 + kw), tip: kw >= 3 ? "화두 핵심어를 충분히 다뤘습니다." : `화두 핵심어(${t.keywords.slice(0, 4).join(", ")} 등)를 더 직접적으로 다루세요.` },
     evidence: { score: clamp(1 + Math.floor(facts / 2)), tip: facts >= 4 ? "발제 사실과 수치를 근거로 잘 썼습니다." : "'발제' 탭의 수치를 슬라이드와 발표에 인용하세요." },
-    collab: { score: clamp(1 + mentioned + (askOk ? 1 : 0) + ((st.rebuttal?.answer || "").length > 40 ? 1 : 0)), tip: mentioned >= 2 ? "다른 부서 입장을 언급하며 조율했습니다." : "반박한 부서를 포함해 2개 이상 부서의 입장을 언급하고 절충안을 내세요." },
+    collab: { score: clamp(1 + mentioned + (askOk ? 1 : 0) + ((st.rebuttal?.answer || myTalk).length > 40 ? 1 : 0)), tip: mentioned >= 2 ? "다른 부서 입장을 언급하며 조율했습니다." : "반박한 부서를 포함해 2개 이상 부서의 입장을 언급하고 절충안을 내세요." },
     risk: { score: clamp((riskOk ? 3 : 1) + (riskAlt ? 2 : 0)), tip: riskOk && riskAlt ? "리스크와 대응을 함께 제시했습니다." : "리스크 한 가지와 그 대응책을 짝지어 쓰세요." },
     structure: { score: clamp((titleOk ? 1 : 0) + pointsFilled + (scriptLen >= 250 ? 1 : 0) - (timeOk ? 0 : 1)), tip: !timeOk ? "제한 시간을 지키지 못했습니다." : !titleOk ? "슬라이드 제목에 결론을 쓰세요." : pointsFilled < 3 ? "실행 방안 3개를 모두 채우세요." : "결론-근거-실행 구조가 갖춰졌습니다." },
   };
@@ -1343,6 +1380,281 @@ async function showReport(code){
   return true;
 }
 
+/* ================= 실시간 스터디 방 (Supabase Realtime) ================= */
+const CFG = window.APP_CONFIG || {};
+const QS = new URLSearchParams(location.search);
+const RT = { on: !!QS.get("room"), code: (QS.get("room") || "").toUpperCase().slice(0, 12), sb: null, ch: null, me: null, members: [], isHost: false,
+  joinedAt: Date.now(), slides: {}, presenter: null, order: [], chat: [], unread: 0, say: null, sayKey: 0, lastSayKey: 0, lastState: null,
+  posAt: 0, others: {}, applying: false, turnStart: 0, prevPresenter: null, myDone: false, toastT: null };
+const ELKEYS = ["type", "x", "y", "w", "h", "text", "font", "size", "color", "bold", "italic", "align", "fill", "stroke", "strokeWidth", "dash", "radius", "role"];
+const compactEls = els => els.map(e => Object.fromEntries(ELKEYS.filter(k => ["x", "y", "w", "h"].includes(k) || (e[k] !== "" && e[k] !== 0 && e[k] !== false && e[k] != null)).map(k => [k, e[k]])));
+function rtList(){
+  const ps = RT.ch ? RT.ch.presenceState() : {};
+  return Object.entries(ps).map(([uid, metas]) => ({ uid, ...metas[metas.length - 1] }))
+    .sort((a, b) => a.joinedAt - b.joinedAt || a.uid.localeCompare(b.uid));
+}
+const humanTeams = () => new Set(RT.members.filter(m => m.team && m.uid !== RT.me.uid).map(m => m.team));
+const memberOfTeam = id => RT.on && RT.me ? RT.members.find(m => m.team === id && m.uid !== RT.me.uid) : null;
+const rtSend = (event, payload) => RT.ch && RT.ch.send({ type: "broadcast", event, payload });
+const rtTrack = () => RT.ch && RT.ch.track({ name: RT.me.name, team: st.team || null, joinedAt: RT.joinedAt, ready: !!ED.ready, entered: !!st.phase });
+// 입력 중일 때는 사이드 패널을 다시 그리지 않고, 입력창을 벗어나면 반영한다
+const typingInSide = () => { const a = document.activeElement; return !!a && /TEXTAREA|INPUT|SELECT/.test(a.tagName) && $("#sideBody").contains(a); };
+function softSide(){ if (typingInSide()) { RT.pendingSide = true; return; } RT.pendingSide = false; renderSide(); }
+document.addEventListener("focusout", e => {
+  if (!RT.pendingSide || !$("#sideBody").contains(e.target)) return;
+  setTimeout(() => { if (RT.pendingSide && !typingInSide()) { RT.pendingSide = false; renderSide(); } }, 60);
+});
+const presenterSpeaker = () => !RT.presenter ? null : RT.presenter === RT.me.uid ? "me" : "h:" + RT.presenter;
+
+async function rtInit(){
+  if (!window.supabase || !CFG.supabaseUrl) { alert("실시간 서버를 불러오지 못했습니다. 인터넷 연결을 확인하세요."); return false; }
+  RT.sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey);
+  const local = ["localhost", "127.0.0.1"].includes(location.hostname), dev = local && QS.get("dev"); // 로컬 테스트 전용
+  if (dev) RT.me = { uid: "dev-" + dev, name: dev };
+  else {
+    const { data: { session } } = await RT.sb.auth.getSession();
+    if (!session) { location.href = "study.html?next=" + encodeURIComponent(location.href); return false; }
+    if (CFG.privateChannels) RT.sb.realtime.setAuth(session.access_token);
+    RT.me = { uid: session.user.id, name: session.user.user_metadata?.name || session.user.email.split("@")[0] };
+  }
+  RT.ch = RT.sb.channel("room:" + RT.code, { config: { presence: { key: RT.me.uid }, broadcast: { self: false }, private: !!CFG.privateChannels } });
+  RT.ch.on("presence", { event: "sync" }, onPresence)
+    .on("broadcast", { event: "state" }, ({ payload }) => applyState(payload))
+    .on("broadcast", { event: "chat" }, ({ payload }) => addChat(payload))
+    .on("broadcast", { event: "speech" }, ({ payload }) => { if (!st.phase) return; RT.applying = true; try { say("h:" + payload.uid, payload.text, "presentation"); } finally { RT.applying = false; } })
+    .on("broadcast", { event: "slide" }, ({ payload }) => { RT.slides[payload.uid] = payload; if (st.phase === "present") renderStage(); if (st.phase) softSide(); })
+    .on("broadcast", { event: "pos" }, ({ payload }) => moveOther(payload))
+    .on("broadcast", { event: "done" }, ({ payload }) => { if (RT.isHost && payload.uid === RT.presenter) nextPresenter(); })
+    .on("broadcast", { event: "hello" }, () => { if (RT.isHost && st.phase) sendState(); if (ED.ready) sendSlide(); });
+  const status = await new Promise(res => RT.ch.subscribe(s => { if (["SUBSCRIBED", "CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(s)) res(s); }));
+  if (status !== "SUBSCRIBED") { alert(`스터디 방에 연결하지 못했습니다 (${status}). 잠시 후 다시 시도하세요.`); return false; }
+  await rtTrack();
+  rtSend("hello", { uid: RT.me.uid });
+  return true;
+}
+function onPresence(){
+  const wasHost = RT.isHost;
+  RT.members = rtList();
+  RT.isHost = RT.members[0]?.uid === RT.me.uid;
+  if (!st.phase) return renderJoin();
+  updateRoomAvatars();
+  if (RT.isHost && !wasHost) { addChat({ system: true, text: "방장이 나가서 내가 방장이 되었습니다. 진행 버튼으로 이어가세요." }); sendState(); }
+  if (st.phase !== "prep") renderStage();
+  softSide();
+}
+function sendState(){
+  if (!RT.on || !RT.isHost || !st.phase) return;
+  rtSend("state", { phase: st.phase, team: MT.team, step: MT.step, presented: [...st.presented], presenter: RT.presenter, order: RT.order,
+    timer: st.timerInfo, say: RT.say, sayKey: RT.sayKey });
+}
+function applyState(s){
+  RT.lastState = s;
+  if (RT.isHost || !st.phase) return;
+  RT.applying = true;
+  try {
+    const changed = st.phase !== s.phase;
+    if (changed) {
+      st.phase = s.phase; st.phaseStartedAt[s.phase] = Date.now(); renderSteps();
+      if (st.tab !== "chat") st.tab = "act"; renderTabs();
+      if (s.phase !== "prep") { commitEdit(); ED.sel = null; } else hideCaption();
+    }
+    if (s.timer) startTimerAt(s.timer.end, s.timer.label); else stopTimer();
+    (s.presented || []).forEach(id => st.presented.add(id));
+    MT.team = s.team; MT.step = s.step || 0;
+    RT.order = s.order || [];
+    const turnChanged = s.presenter !== RT.prevPresenter;
+    if (turnChanged) { RT.prevPresenter = s.presenter; RT.turnStart = Date.now(); }
+    RT.presenter = s.presenter;
+    if (s.phase === "present") st.speakerId = presenterSpeaker();
+    if (s.say && s.sayKey !== RT.lastSayKey) {
+      RT.lastSayKey = s.sayKey;
+      say(s.say.id === "h:" + RT.me.uid ? "me" : s.say.id, s.say.text, s.say.kind);
+    } else if (s.phase !== "prep" || changed) renderStage();
+    if (changed || turnChanged) renderSide(); else softSide();
+  } finally { RT.applying = false; }
+}
+function roomEntered(){
+  $("#chatTab").classList.remove("hidden");
+  rtTrack(); updateRoomAvatars();
+  if (RT.isHost) sendState();
+  else if (RT.lastState) applyState(RT.lastState);
+  else rtSend("hello", { uid: RT.me.uid });
+}
+function startRoomPresent(){
+  RT.order = RT.members.filter(m => m.team && m.entered && teamById(m.team)).sort((a, b) => teamById(a.team).seat - teamById(b.team).seat).map(m => m.uid);
+  if (!RT.order.length) return alert("발표할 스터디원이 없습니다.");
+  RT.presenter = RT.order[0]; RT.prevPresenter = RT.presenter; RT.turnStart = Date.now();
+  setPhase("present");
+}
+function nextPresenter(){
+  const i = RT.order.indexOf(RT.presenter) + 1;
+  if (i >= RT.order.length) { RT.presenter = null; return setPhase("result"); }
+  RT.presenter = RT.order[i]; RT.prevPresenter = RT.presenter; RT.turnStart = Date.now();
+  st.speakerId = presenterSpeaker();
+  startTimer(S.agenda.speakSeconds, "발표");
+  sendState(); renderStage(); renderSide();
+}
+function finishMyTurn(){
+  st.presentSeconds = Math.round((Date.now() - (RT.turnStart || Date.now())) / 1000);
+  stopMic(); RT.myDone = true;
+  const text = st.script.trim() || "(스크립트 없음)";
+  if (RT.isHost) { say("me", text, "presentation"); nextPresenter(); }
+  else { rtSend("speech", { uid: RT.me.uid, text }); say("me", text, "presentation"); rtSend("done", { uid: RT.me.uid }); }
+  renderSide();
+}
+function sendSlide(){ rtSend("slide", { uid: RT.me.uid, name: st.name, team: myTeam().name, title: slideTitle(), els: compactEls(ED.els) }); }
+function presenterView(){
+  if (!RT.on || !RT.presenter || RT.presenter === RT.me.uid) return null;
+  const s = RT.slides[RT.presenter], w = who("h:" + RT.presenter);
+  if (!s) return { els: [], team: w.team, name: w.name, title: "", waiting: true };
+  return { els: s.els.map((e, i) => mk({ ...e, id: "o" + i })), team: s.team, name: s.name, title: s.title };
+}
+
+/* 채팅·반박 */
+function addChat(m){
+  RT.chat.push(m); if (st.tab !== "chat") RT.unread++;
+  if (!m.system) st.log.push({ at: m.at || new Date().toISOString(), speakerId: "h:" + m.uid, speaker: m.name, team: m.team || "", kind: m.kind || "chat", text: m.text });
+  updateChatTab();
+  if (st.phase && (st.tab === "chat" || (st.phase === "present" && m.kind === "rebuttal"))) { if (m.uid === RT.me.uid) renderSide(); else softSide(); }
+  if (!m.system && m.uid !== RT.me.uid) toast(`💬 ${m.name}: ${m.text}`);
+  if (m.system) toast(m.text);
+}
+function sendChat(text, kind = "chat"){
+  text = text.trim().slice(0, 500); if (!text) return;
+  const m = { uid: RT.me.uid, name: st.name || RT.me.name, team: myTeam()?.name || "", text, kind, at: new Date().toISOString() };
+  rtSend("chat", m); addChat(m);
+}
+function updateChatTab(){ const b = $("#chatTab"); if (b) b.textContent = RT.unread ? `채팅 (${RT.unread})` : "채팅"; }
+function chatBox(kind = "chat", ph = "메시지를 입력하고 Enter"){
+  const wrap = el("div", "chat-box"), inp = el("textarea", "t"); inp.rows = 2; inp.placeholder = ph; inp.maxLength = 500;
+  const send = el("button", "btn primary", "보내기");
+  const go = () => { const v = inp.value; inp.value = ""; sendChat(v, kind); setTimeout(() => { const n = $("#sideBody .chat-box textarea"); if (n) n.focus(); }, 0); };
+  send.onclick = go; inp.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); go(); } };
+  wrap.append(inp, send); return wrap;
+}
+function chatItem(m){
+  const it = el("div", "chat-item" + (m.uid === RT.me.uid ? " mine" : "") + (m.system ? " sys" : ""));
+  if (!m.system) it.append(el("b", null, `${m.name}${m.team ? " · " + m.team : ""}${m.kind === "rebuttal" ? " · 반박/질문" : ""}`));
+  it.append(el("div", null, m.text)); return it;
+}
+function chatPanel(body){
+  RT.unread = 0; updateChatTab();
+  const list = el("div", "chat-list");
+  if (!RT.chat.length) list.append(el("div", "hint", "아직 메시지가 없습니다. 스터디원과 자유롭게 이야기하세요."));
+  RT.chat.forEach(m => list.append(chatItem(m)));
+  body.append(list, chatBox());
+  body.scrollTop = body.scrollHeight;
+}
+function toast(t){ const x = $("#toast"); if (!x) return; x.textContent = t.length > 90 ? t.slice(0, 90) + "…" : t; x.classList.remove("hidden"); clearTimeout(RT.toastT); RT.toastT = setTimeout(() => x.classList.add("hidden"), 3500); }
+
+/* 회의실 아바타 */
+function updateRoomAvatars(){
+  if (!RT.on || !st.phase) return;
+  const room = $("#room");
+  S.teams.forEach(t => { if (t.id !== st.team && avatars[t.id]) avatars[t.id].classList.toggle("seat-empty", !!memberOfTeam(t.id)); });
+  RT.members.filter(m => m.uid !== RT.me.uid && m.team && m.entered).forEach(m => {
+    const key = "h:" + m.uid, t = teamById(m.team); if (!t || avatars[key]) return;
+    const seat = SEATS[t.seat];
+    avatars[key] = addAvatar(room, initials(m.name), `${m.name} · ${t.name}`, t.color, RT.others[m.uid] || { x: seat.x, y: seat.y + (seat.y < 300 ? -46 : 46) }, "human");
+  });
+  Object.keys(avatars).filter(k => k.startsWith("h:") && !RT.members.some(m => "h:" + m.uid === k)).forEach(k => { avatars[k].remove(); delete avatars[k]; });
+}
+function moveOther(p){ RT.others[p.uid] = { x: p.x, y: p.y }; const a = avatars["h:" + p.uid]; if (a) { a.style.left = p.x + "px"; a.style.top = p.y + "px"; } }
+function sendPos(){ if (!RT.on || !RT.ch) return; const now = Date.now(); if (now - RT.posAt < 120) return; RT.posAt = now; rtSend("pos", { uid: RT.me.uid, x: Math.round(st.me.x), y: Math.round(st.me.y) }); }
+
+/* 입장 화면 (스터디 방) */
+function renderRoomJoin(){
+  const hs = document.querySelectorAll("#join h2"), sub = $("#join .sub");
+  hs[0].textContent = "스터디 방"; hs[1].textContent = "참가자";
+  sub.textContent = "스터디원이 모두 들어오면 각자 다른 직무를 고르고 입장하세요. 빈 자리는 가상 부서가 채웁니다.";
+  const box = $("#roleChips"); box.innerHTML = "";
+  const link = location.href.split("#")[0].replace(/[?&]dev=[^&]*/, "");
+  const c = el("div", "card room-card");
+  c.append(el("div", "k", `${S.company.name} · ${S.shortTitle}`), el("div", "room-code", RT.code));
+  const row = el("div", "btn-row"), cp = el("button", "btn", "초대 링크 복사");
+  cp.onclick = async () => { try { await navigator.clipboard.writeText(link); cp.textContent = "복사됨"; } catch { prompt("초대 링크", link); } };
+  const out = el("a", "btn", "다른 방으로"); out.href = "study.html";
+  row.append(cp, out); c.append(row); box.append(c);
+  const sg = $("#scGrid"); sg.innerHTML = "";
+  const ul = el("ul", "tl");
+  RT.members.forEach((m, i) => { const t = teamById(m.team), li = el("li"), dot = el("span", "dot"); dot.style.background = t ? t.color : "#555"; li.append(dot, el("span", null, m.name + (m.uid === RT.me.uid ? " (나)" : "")), el("span", "st", `${i === 0 ? "방장 · " : ""}${t ? t.name : "직무 선택 중"}${m.entered ? " · 입장" : ""}`)); ul.append(li); });
+  sg.append(ul, el("div", "hint", RT.members.length > 4 ? "권장 인원(4명)을 넘었습니다." : `${RT.members.length}/4명 접속`));
+  const ab = $("#agendaBox"); ab.innerHTML = "";
+  ab.append(el("div", "k", `${S.company.interviewType} · 준비 ${S.agenda.prepMinutes}분 · 발표 ${Math.round(S.agenda.speakSeconds / 60)}분`), el("h3", null, S.agenda.title), el("div", null, S.agenda.situation));
+  const grid = $("#teamGrid"); grid.innerHTML = "";
+  if (st.team && memberOfTeam(st.team)) st.team = null;
+  S.teams.forEach(t => {
+    const taken = memberOfTeam(t.id), b = el("button", "team-card" + (st.team === t.id ? " sel" : "") + (taken ? " excluded" : ""));
+    const nm = el("div", "nm"), dot = el("span", "dot"); dot.style.background = t.color;
+    nm.append(dot, document.createTextNode(t.name)); if (taken) nm.append(el("span", "xb", taken.name + " 선택"));
+    b.append(nm, el("div", "pr", "화두 · " + t.prompt));
+    if (!taken) b.onclick = () => { st.team = t.id; rtTrack(); renderJoin(); };
+    grid.append(b);
+  });
+  nameInput.value = RT.me.name; nameInput.disabled = true;
+  checkJoin();
+}
+
+/* 방 모드 사이드 패널 */
+function roomSide(body, P){
+  const host = RT.isHost, hostName = RT.members[0]?.name || "";
+  const top = el("div", "card"); top.append(el("div", "k", `스터디 방 ${RT.code} · ${RT.members.length}명`));
+  const ul = el("ul", "tl");
+  RT.members.forEach((m, i) => { const t = teamById(m.team), li = el("li"), dot = el("span", "dot"); dot.style.background = t ? t.color : "#555"; li.append(dot, el("span", null, m.name + (m.uid === RT.me.uid ? " (나)" : "")), el("span", "st", `${i === 0 ? "방장 · " : ""}${t ? t.name : "선택 중"}${P === "prep" && m.team ? (m.ready ? " · 준비 완료" : " · 준비 중") : ""}`)); ul.append(li); });
+  top.append(ul); body.append(top);
+  if (P === "brief") {
+    body.append(myPromptCard());
+    if (host) button(body, "부서별 발표 시작 (모두의 화면이 넘어갑니다)", () => setPhase("meeting"));
+    else body.append(el("div", "hint", `방장(${hostName})이 진행을 시작하면 모두의 화면이 함께 넘어갑니다.`));
+  }
+  if (P === "meeting") {
+    if (MT.team) {
+      const t = teamById(MT.team), c = el("div", "card"), h = el("h3", null, `${t.name} 발표 중`); h.style.color = t.color;
+      c.append(el("div", "k", `슬라이드 단계 ${MT.step + 1}/4`), h, el("div", null, t.npc.stance));
+      if (host) {
+        const row = el("div", "btn-row");
+        const play = el("button", "btn", MT.auto ? "⏸ 일시정지" : "▶ 자동 진행"); play.onclick = () => { MT.auto = !MT.auto; if (MT.auto) advance(); else clearTimeout(MT.timer); renderSide(); };
+        const nx = el("button", "btn", "다음 장면 ⏭"); nx.onclick = () => { clearTimeout(MT.timer); advance(); };
+        const sk = el("button", "btn", "다음 부서 ⏩"); sk.onclick = () => { clearTimeout(MT.timer); nextTeam(); };
+        row.append(play, nx, sk); c.append(row);
+      }
+      body.append(c);
+    }
+    body.append(myPromptCard(), teamList());
+    if (!MT.team && st.phase === "meeting") {
+      if (host) button(body, "모두 PPT 만들기 시작", () => setPhase("prep"));
+      else body.append(el("div", "hint", "방장이 PPT 만들기 단계를 열면 각자 편집을 시작합니다."));
+    }
+  }
+  if (P === "prep") {
+    body.append(myPromptCard());
+    const c = el("div", "card"); c.append(el("div", "k", "편집 방법"), el("div", "hint", "더블클릭·Enter로 글자 수정, 드래그로 이동, 모서리로 크기 조절, 상단 도구로 도형·선·글꼴. 다 만들면 '준비 완료'로 슬라이드를 공유하세요."));
+    body.append(c);
+    button(body, ED.ready ? "다시 공유 (수정 내용 반영)" : "준비 완료 · 슬라이드 공유", () => { commitEdit(); ED.ready = true; sendSlide(); rtTrack(); renderSide(); }, !ED.ready);
+    const ready = RT.members.filter(m => m.team && m.ready).length, total = RT.members.filter(m => m.team).length;
+    body.append(el("div", "hint", `준비 완료 ${ready}/${total}명`));
+    if (host) button(body, "돌아가며 발표 시작", () => { commitEdit(); if (!ED.ready) { ED.ready = true; sendSlide(); rtTrack(); } startRoomPresent(); });
+    else body.append(el("div", "hint", "모두 준비되면 방장이 발표를 시작합니다."));
+  }
+  if (P === "present") {
+    const mine = RT.presenter === RT.me.uid, w = who(presenterSpeaker() || "me");
+    const c = el("div", "card" + (mine ? " mine" : ""));
+    c.append(el("div", "k", `발표 순서 ${Math.max(1, RT.order.indexOf(RT.presenter) + 1)}/${RT.order.length}`), el("h3", null, mine ? "내 차례입니다" : `${w.name} (${w.team}) 발표 중`));
+    body.append(c);
+    if (mine && !RT.myDone) {
+      const ta = field(body, "발표 스크립트 (마이크를 켜면 받아 적힙니다)", st.script, x => { st.script = x; }, { area: true, rows: 8, ph: "결론 → 근거 → 실행 → 리스크 순서로 말해보세요." });
+      ta.id = "scriptBox";
+      button(body, "발표 마치기", finishMyTurn);
+    } else if (!mine) {
+      body.append(el("label", "f", "발표자에게 반박·질문"), chatBox("rebuttal", "다른 부서 입장에서 반박하거나 질문하세요 (Enter)"));
+    }
+    const recent = RT.chat.filter(m => m.kind === "rebuttal").slice(-5);
+    if (recent.length) { body.append(el("div", "k", "최근 반박·질문")); recent.forEach(m => body.append(chatItem(m))); }
+    if (host) button(body, RT.order.indexOf(RT.presenter) + 1 >= RT.order.length ? "발표 끝내고 결과 보기" : "다음 발표자 ⏭", nextPresenter, false);
+  }
+  if (P === "result") resultPanel(body);
+}
+
 /* ================= 하단 컨트롤 ================= */
 $("#viewBtn").onclick = () => {
   if (!st.phase) return;
@@ -1373,12 +1685,17 @@ $("#micBtn").onclick = () => {
   r.onend = () => { if (st.mic) r.start(); };
   r.start(); st.mic = r; $("#micBtn").classList.remove("off");
 };
-$("#leaveBtn").onclick = () => { if (confirm("면접을 종료하고 나갈까요?")) location.href = "index.html"; };
+$("#leaveBtn").onclick = () => { if (confirm("면접을 종료하고 나갈까요?")) location.href = RT.on ? "study.html" : "index.html"; };
 
 /* ================= 시작 ================= */
 const want = new URLSearchParams(location.search).get("s");
 S = ALL.find(s => s.id === want) || ALL[0];
 if (location.hash.startsWith("#r=")) showReport(location.hash.slice(3)).then(ok => { if (!ok) renderJoin(); });
+else if (RT.on) {
+  PHASES = PHASES.filter(p => !["rebuttal", "qa"].includes(p.id)).map(p => p.id === "present" ? { ...p, label: "돌아가며 발표" } : p);
+  $("#joinNeed").textContent = "스터디 방에 연결하는 중…"; $("#joinBtn").disabled = true;
+  rtInit().then(ok => { if (ok) renderJoin(); else $("#joinNeed").textContent = "연결하지 못했습니다. 새로고침하거나 study.html에서 다시 들어오세요."; });
+}
 else renderJoin();
 })();
 </script>
