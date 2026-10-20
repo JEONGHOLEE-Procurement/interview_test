@@ -13,7 +13,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-body{background:var(--ground);color:var(--ink);font-family:var(--body);margin:0;padding:32px 16px 56px}
+body{word-break:keep-all;background:var(--ground);color:var(--ink);font-family:var(--body);margin:0;padding:32px 16px 56px}
 .top{max-width:1120px;margin:0 auto 28px;display:grid;gap:8px}
 .top h1{font-family:var(--display);font-weight:400;font-size:clamp(26px,4vw,36px);margin:0;letter-spacing:.01em;text-wrap:balance}
 .top p{margin:0;color:var(--muted);font-size:14px;line-height:1.7;max-width:68ch}
@@ -22,10 +22,10 @@ body{background:var(--ground);color:var(--ink);font-family:var(--body);margin:0;
 
 /* 카드: 4:5, 내부 단위는 카드 너비 기준 cqw */
 .c{container-type:inline-size;aspect-ratio:4/5;max-width:100%;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;position:relative}
-.in{position:absolute;inset:0;padding:7cqw 7cqw 6cqw;display:flex;flex-direction:column;gap:3.6cqw}
+.in{position:absolute;inset:0;padding:6.5cqw 7cqw 5.5cqw;display:flex;flex-direction:column;gap:3cqw}
 .meta{display:flex;justify-content:space-between;align-items:center;font-size:3.2cqw;color:var(--muted);letter-spacing:.06em}
 .meta b{color:var(--blue);font-weight:700}
-.step{font-family:var(--display);font-size:16cqw;line-height:.9;color:var(--blue)}
+.step{font-family:var(--display);font-size:12cqw;line-height:.9;color:var(--blue)}
 h2{font-family:var(--display);font-weight:400;font-size:8.4cqw;line-height:1.15;margin:0;text-wrap:balance}
 .lead{font-size:4cqw;line-height:1.6;color:var(--muted);margin:0}
 .lead b{color:var(--ink);font-weight:700}
@@ -33,7 +33,7 @@ h2{font-family:var(--display);font-weight:400;font-size:8.4cqw;line-height:1.15;
 .foot b{color:var(--warn);font-weight:700}
 
 /* 화면 목업 */
-.ui{background:var(--panel);border:1px solid var(--line);border-radius:3cqw;padding:4cqw;display:flex;flex-direction:column;gap:2.4cqw;font-size:3.4cqw}
+.ui{background:var(--panel);border:1px solid var(--line);border-radius:3cqw;padding:3.4cqw 4cqw;display:flex;flex-direction:column;gap:2cqw;font-size:3.4cqw}
 .tabs{display:flex;gap:1.6cqw}
 .tabs span{flex:1;text-align:center;padding:1.8cqw 0;border-radius:1.6cqw;background:#0f131b;color:var(--muted)}
 .tabs .on{background:var(--blue);color:#fff;font-weight:700}
@@ -46,7 +46,7 @@ h2{font-family:var(--display);font-weight:400;font-size:8.4cqw;line-height:1.15;
 .box{flex:none;width:3.4cqw;height:3.4cqw;border-radius:.8cqw;background:var(--blue);margin-top:.5cqw;position:relative}
 .box::after{content:"";position:absolute;left:1.1cqw;top:.4cqw;width:.9cqw;height:1.8cqw;border:solid #fff;border-width:0 .5cqw .5cqw 0;transform:rotate(45deg)}
 .mark{outline:.6cqw solid var(--warn);outline-offset:.8cqw}
-.url{font-family:var(--mono);font-size:3.5cqw;background:var(--blue-soft);color:#cfe3ff;border-radius:2cqw;padding:3cqw 3.4cqw;word-break:break-all;line-height:1.45}
+.url{word-break:break-all;font-family:var(--mono);font-size:3.5cqw;background:var(--blue-soft);color:#cfe3ff;border-radius:2cqw;padding:3cqw 3.4cqw;word-break:break-all;line-height:1.45}
 .code6{font-family:var(--mono);font-size:9cqw;letter-spacing:1.6cqw;text-align:center;color:var(--ink);padding:1cqw 0}
 .mail-h{display:flex;justify-content:space-between;color:var(--muted);font-size:3cqw;border-bottom:1px solid var(--line);padding-bottom:2cqw}
 .room{font-family:var(--mono);font-size:7cqw;text-align:center;letter-spacing:.4cqw;color:var(--ink)}
@@ -120,7 +120,7 @@ h2{font-family:var(--display);font-weight:400;font-size:8.4cqw;line-height:1.15;
       <div class="tick"><span class="box"></span>저장 동의 체크</div>
       <div class="btn">회원가입</div>
     </div>
-    <div class="foot">비밀번호는 <b>8자 이상</b>. 이메일은 지금 바로 열어 볼 수 있는 주소로 쓰세요.</div>
+    <div class="foot">비밀번호는 <b>8자 이상</b>, 이메일은 바로 확인할 수 있는 주소로.</div>
   </div></article>
 
   <!-- 3. 메일 인증 -->
@@ -172,7 +172,7 @@ h2{font-family:var(--display);font-weight:400;font-size:8.4cqw;line-height:1.15;
       <div class="room">K7P2Q-03</div>
       <div style="display:flex;gap:2cqw"><div class="btn mark" style="flex:1">초대 링크 복사</div><div class="btn ghost" style="flex:1">다른 방으로</div></div>
     </div>
-    <div class="foot">방을 만든 사람이 <b>방장</b>이에요. 방장이 단계를 넘겨야 모두의 화면이 같이 넘어가요.</div>
+    <div class="foot">방을 만든 사람이 <b>방장</b>. 방장이 단계를 넘기면 모두의 화면이 같이 넘어가요.</div>
   </div></article>
 
   <!-- 6. 친구 입장 -->
@@ -207,8 +207,8 @@ h2{font-family:var(--display);font-weight:400;font-size:8.4cqw;line-height:1.15;
       </ul>
       <span class="count">4/4명 접속</span>
     </div>
-    <p class="lead">각자 <b>다른 직무</b>를 골라 입장하고, 방장이 <b>다음 단계</b>를 누르면 모두의 화면이 같이 넘어가는지 봐 주세요.</p>
-    <div class="foot">이름이 안 보이는 사람이 있으면 그 사람만 <b>새로고침</b> 한 번 해 보고, 그래도 안 되면 캡처해 주세요.</div>
+    <p class="lead">각자 <b>다른 직무</b>를 골라 입장한 뒤, 방장이 넘기면 화면이 같이 넘어가는지 봐 주세요.</p>
+    <div class="foot">안 보이는 사람은 <b>새로고침</b> 한 번, 그래도 안 되면 캡처해 주세요.</div>
   </div></article>
 
   <!-- 8. 체크리스트 -->
