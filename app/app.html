@@ -76,6 +76,7 @@ a{color:#7fb6ff}
 .tile .label{position:absolute;left:8px;bottom:6px;font-size:12px;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:6px;max-width:calc(100% - 16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile .badge{position:absolute;right:8px;top:6px;font-size:11px;background:var(--accent);padding:1px 6px;border-radius:6px}
 .tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.tile video.remote{transform:none}
 
 /* ---------- 슬라이드 (Investor Day 템플릿) ---------- */
 .deck-holder{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
@@ -974,7 +975,8 @@ function participants(){
 }
 function makeTile(p){
   const tile = el("div", "tile" + (st.speakerId === p.id ? " speaking" : ""));
-  if (p.me && st.cam) { const v = document.createElement("video"); v.autoplay = v.muted = v.playsInline = true; v.srcObject = st.cam; tile.append(v); }
+  const peer = p.human && rtcVideo(p.id.slice(2));
+  if ((p.me && st.cam) || peer) { const v = document.createElement("video"); v.autoplay = v.muted = v.playsInline = true; v.srcObject = peer || st.cam; if (peer) v.className = "remote"; tile.append(v); }
   else { const f = el("div", "face", initials(p.name)); f.style.background = p.color; tile.append(f); }
   tile.append(el("div", "label", `${p.name} · ${p.team}`));
   if (p.me) tile.append(el("div", "badge", "나"));
@@ -998,6 +1000,7 @@ function renderZoom(){
   if (kind === "player") renderPlayerSlide(holder, presenterView());
 }
 function renderStage(text){
+  if (RT.on) syncDictation();
   const editing = st.phase === "prep" && st.view === "zoom";
   $("#zoomView").classList.toggle("hidden", st.view !== "zoom" || editing);
   $("#editorView").classList.toggle("hidden", !editing);
@@ -1385,7 +1388,8 @@ const CFG = window.APP_CONFIG || {};
 const QS = new URLSearchParams(location.search);
 const RT = { on: !!QS.get("room"), code: (QS.get("room") || "").toUpperCase().slice(0, 12), sb: null, ch: null, me: null, members: [], isHost: false,
   joinedAt: Date.now(), slides: {}, presenter: null, order: [], chat: [], unread: 0, say: null, sayKey: 0, lastSayKey: 0, lastState: null,
-  posAt: 0, others: {}, applying: false, turnStart: 0, prevPresenter: null, myDone: false, toastT: null };
+  posAt: 0, others: {}, applying: false, turnStart: 0, prevPresenter: null, myDone: false, toastT: null,
+  sid: Math.random().toString(36).slice(2, 10), peers: {}, voice: null }; // sid: 이 탭의 접속 id (새로고침하면 바뀜)
 const ELKEYS = ["type", "x", "y", "w", "h", "text", "font", "size", "color", "bold", "italic", "align", "fill", "stroke", "strokeWidth", "dash", "radius", "role"];
 const compactEls = els => els.map(e => Object.fromEntries(ELKEYS.filter(k => ["x", "y", "w", "h"].includes(k) || (e[k] !== "" && e[k] !== 0 && e[k] !== false && e[k] != null)).map(k => [k, e[k]])));
 function rtList(){
@@ -1396,7 +1400,74 @@ function rtList(){
 const humanTeams = () => new Set(RT.members.filter(m => m.team && m.uid !== RT.me.uid).map(m => m.team));
 const memberOfTeam = id => RT.on && RT.me ? RT.members.find(m => m.team === id && m.uid !== RT.me.uid) : null;
 const rtSend = (event, payload) => RT.ch && RT.ch.send({ type: "broadcast", event, payload });
-const rtTrack = () => RT.ch && RT.ch.track({ name: RT.me.name, team: st.team || null, joinedAt: RT.joinedAt, ready: !!ED.ready, entered: !!st.phase });
+const rtTrack = () => RT.ch && RT.ch.track({ name: RT.me.name, team: st.team || null, joinedAt: RT.joinedAt, ready: !!ED.ready, entered: !!st.phase, sid: RT.sid, cam: !!st.cam, mic: !!RT.voice });
+
+/* 화상·음성 (WebRTC, 참가자끼리 직접 연결). 연결 정보만 방 채널로 주고받고 영상·음성은 서버를 거치지 않는다.
+   두 사람 중 uid가 작은 쪽이 연결을 연다. 마이크·카메라를 켜고 끌 때는 트랙만 바꿔 끼워 재연결하지 않는다. */
+const ICE = { iceServers: CFG.iceServers || [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }] };
+const rtcSend = (p, data) => rtSend("rtc", { from: RT.me.uid, fromSid: RT.sid, to: p.uid, toSid: p.sid, ...data });
+function rtcClose(uid){ const p = RT.peers[uid]; if (!p) return; delete RT.peers[uid]; try { p.pc.close(); } catch {} p.audio.srcObject = null; }
+function rtcPeer(uid, sid){
+  rtcClose(uid);
+  const pc = new RTCPeerConnection(ICE), stream = new MediaStream(), audio = new Audio();
+  audio.autoplay = true; audio.srcObject = stream;
+  const p = { uid, sid, pc, stream, audio, queue: [], seen: false };
+  pc.ontrack = e => {
+    if (!stream.getTracks().includes(e.track)) stream.addTrack(e.track);
+    audio.play().catch(() => {});
+    if (e.track.kind === "video" && st.phase && st.phase !== "prep") renderStage();
+  };
+  pc.onicecandidate = e => { if (e.candidate) rtcSend(p, { ice: e.candidate.toJSON() }); };
+  pc.onconnectionstatechange = () => { // 끊기면 연결을 연 쪽이 다시 연다
+    if (pc.connectionState === "failed" && RT.me.uid < uid) setTimeout(() => { if (RT.peers[uid] === p) rtcOffer(uid, sid); }, 2000);
+  };
+  RT.peers[uid] = p; return p;
+}
+function rtcAttach(p){ // 내 마이크·카메라 트랙을 실어 보낸다 (꺼져 있으면 빈 트랙)
+  p.pc.getTransceivers().forEach(t => {
+    if (p.pc.signalingState === "closed") return;
+    t.direction = "sendrecv";
+    t.sender.replaceTrack(t.receiver.track.kind === "audio" ? RT.voice : (st.cam ? st.cam.getVideoTracks()[0] : null)).catch(() => {});
+  });
+}
+async function rtcOffer(uid, sid){
+  const p = rtcPeer(uid, sid);
+  try {
+    p.pc.addTransceiver("audio"); p.pc.addTransceiver("video"); rtcAttach(p);
+    await p.pc.setLocalDescription(await p.pc.createOffer());
+    rtcSend(p, { sdp: p.pc.localDescription.toJSON() });
+  } catch (err) { console.warn("rtc offer", err); }
+}
+async function onRtc(m){
+  if (m.to !== RT.me.uid || m.toSid !== RT.sid || !window.RTCPeerConnection) return;
+  let p = RT.peers[m.from];
+  try {
+    if (m.sdp && m.sdp.type === "offer") {
+      p = rtcPeer(m.from, m.fromSid);
+      await p.pc.setRemoteDescription(m.sdp); rtcAttach(p);
+      await p.pc.setLocalDescription(await p.pc.createAnswer());
+      rtcSend(p, { sdp: p.pc.localDescription.toJSON() });
+    } else if (!p || p.sid !== m.fromSid) return;
+    else if (m.sdp) await p.pc.setRemoteDescription(m.sdp);
+    else if (m.ice) { if (!p.pc.remoteDescription) return p.queue.push(m.ice); await p.pc.addIceCandidate(m.ice); }
+    while (p.queue.length && p.pc.remoteDescription) await p.pc.addIceCandidate(p.queue.shift());
+  } catch (err) { console.warn("rtc", err); }
+}
+function rtcSync(){ // 참가자 목록이 바뀔 때: 나간 사람 연결은 닫고, 새로 온 사람과는 연결을 연다
+  if (!window.RTCPeerConnection) return;
+  const here = new Map(RT.members.filter(m => m.uid !== RT.me.uid && m.sid).map(m => [m.uid, m.sid]));
+  Object.values(RT.peers).forEach(p => {
+    if (here.get(p.uid) === p.sid) p.seen = true;
+    else if (here.has(p.uid) || p.seen) rtcClose(p.uid); // 새로고침(다른 sid) 또는 퇴장
+  });
+  here.forEach((sid, uid) => { if (!RT.peers[uid] && RT.me.uid < uid) rtcOffer(uid, sid); });
+}
+const rtcVideo = uid => { // 상대가 카메라를 켰고 영상이 들어오고 있으면 그 스트림
+  const p = RT.peers[uid], m = RT.members.find(x => x.uid === uid);
+  return p && m && m.cam && p.stream.getVideoTracks().length ? p.stream : null;
+};
+document.addEventListener("click", () => Object.values(RT.peers).forEach(p => p.audio.play().catch(() => {}))); // 자동재생이 막혔을 때 첫 클릭에 소리 재생
+addEventListener("pagehide", () => Object.keys(RT.peers).forEach(rtcClose));
 // 입력 중일 때는 사이드 패널을 다시 그리지 않고, 입력창을 벗어나면 반영한다
 const typingInSide = () => { const a = document.activeElement; return !!a && /TEXTAREA|INPUT|SELECT/.test(a.tagName) && $("#sideBody").contains(a); };
 function softSide(){ if (typingInSide()) { RT.pendingSide = true; return; } RT.pendingSide = false; renderSide(); }
@@ -1425,6 +1496,7 @@ async function rtInit(){
     .on("broadcast", { event: "slide" }, ({ payload }) => { RT.slides[payload.uid] = payload; if (st.phase === "present") renderStage(); if (st.phase) softSide(); })
     .on("broadcast", { event: "pos" }, ({ payload }) => moveOther(payload))
     .on("broadcast", { event: "done" }, ({ payload }) => { if (RT.isHost && payload.uid === RT.presenter) nextPresenter(); })
+    .on("broadcast", { event: "rtc" }, ({ payload }) => onRtc(payload))
     .on("broadcast", { event: "hello" }, () => { if (RT.isHost && st.phase) sendState(); if (ED.ready) sendSlide(); });
   const status = await new Promise(res => RT.ch.subscribe(s => { if (["SUBSCRIBED", "CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(s)) res(s); }));
   if (status !== "SUBSCRIBED") { alert(`스터디 방에 연결하지 못했습니다 (${status}). 잠시 후 다시 시도하세요.`); return false; }
@@ -1436,6 +1508,7 @@ function onPresence(){
   const wasHost = RT.isHost;
   RT.members = rtList();
   RT.isHost = RT.members[0]?.uid === RT.me.uid;
+  rtcSync();
   if (!st.phase) return renderJoin();
   updateRoomAvatars();
   if (RT.isHost && !wasHost) { addChat({ system: true, text: "방장이 나가서 내가 방장이 되었습니다. 진행 버튼으로 이어가세요." }); sendState(); }
@@ -1668,23 +1741,40 @@ $("#viewBtn").onclick = () => {
 $("#ttsBtn").onclick = () => { st.tts = !st.tts; $("#ttsBtn").classList.toggle("off", !st.tts); if (!st.tts && "speechSynthesis" in window) speechSynthesis.cancel(); };
 $("#camBtn").onclick = async () => {
   if (st.cam) { st.cam.getTracks().forEach(t => t.stop()); st.cam = null; }
-  else { try { st.cam = await navigator.mediaDevices.getUserMedia({ video: true }); } catch { alert("카메라를 사용할 수 없습니다. 브라우저 권한을 확인하세요."); } }
-  $("#camBtn").classList.toggle("off", !st.cam); if (st.phase) renderStage();
+  else { try { st.cam = await navigator.mediaDevices.getUserMedia({ video: RT.on ? { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } } : true }); } catch { alert("카메라를 사용할 수 없습니다. 브라우저 권한을 확인하세요."); } }
+  $("#camBtn").classList.toggle("off", !st.cam);
+  if (RT.on) { Object.values(RT.peers).forEach(rtcAttach); rtTrack(); }
+  if (st.phase) renderStage();
 };
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-function stopMic(){ if (st.mic) { st.mic.onend = null; st.mic.stop(); st.mic = null; } $("#micBtn").classList.add("off"); }
-$("#micBtn").onclick = () => {
+function stopMic(){ if (st.mic) { st.mic.onend = null; st.mic.stop(); st.mic = null; } if (!RT.on) $("#micBtn").classList.add("off"); }
+// 스터디 방: 마이크 버튼 = 내 목소리를 방에 보냄. 내 발표 차례에는 받아쓰기도 같이 켜서 스크립트를 채운다
+function syncDictation(){
+  const want = !!RT.voice && !!SR && st.phase === "present" && RT.presenter === RT.me.uid && !RT.myDone;
+  if (want && !st.mic) startDictation(); else if (!want && st.mic) stopMic();
+}
+$("#micBtn").onclick = async () => {
+  if (RT.on) {
+    if (RT.voice) { RT.voice.stop(); RT.voice = null; }
+    else { try { RT.voice = (await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })).getAudioTracks()[0]; } catch { return alert("마이크를 사용할 수 없습니다. 브라우저 권한을 확인하세요."); } }
+    $("#micBtn").classList.toggle("off", !RT.voice);
+    Object.values(RT.peers).forEach(rtcAttach); rtTrack(); syncDictation();
+    return;
+  }
   if (st.mic) return stopMic();
   if (!SR) return alert("이 브라우저는 음성 받아쓰기를 지원하지 않습니다. Chrome에서 열거나 직접 입력하세요.");
   if (st.phase !== "present") return alert("마이크 받아쓰기는 발표 단계에서 사용합니다.");
+  startDictation(); $("#micBtn").classList.remove("off");
+};
+function startDictation(){
   const r = new SR(); r.lang = "ko-KR"; r.continuous = true; r.interimResults = false;
   r.onresult = e => {
     for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) st.script += (st.script ? " " : "") + e.results[i][0].transcript.trim();
     st.scriptSource = "speech"; const box = $("#scriptBox"); if (box) box.value = st.script;
   };
-  r.onend = () => { if (st.mic) r.start(); };
-  r.start(); st.mic = r; $("#micBtn").classList.remove("off");
-};
+  r.onend = () => { if (st.mic === r) r.start(); };
+  r.start(); st.mic = r;
+}
 $("#leaveBtn").onclick = () => { if (confirm("면접을 종료하고 나갈까요?")) location.href = RT.on ? "study.html" : "index.html"; };
 
 /* ================= 시작 ================= */
